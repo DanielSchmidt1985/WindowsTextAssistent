@@ -54,6 +54,9 @@ claude -p --model <modell> --output-format json --system-prompt "<system-prompt>
   `api_error_status` (401/403 = Login, 429 = Limit) und am Text in `result`. Beispiel eines echten Fehlerlaufs:
   `{"is_error":true,"terminal_reason":"api_error","result":"Failed to authenticate: OAuth session expired and could not be refreshed", …}`
 
+Erster echter Lauf (31.10.2026, Modell `haiku`): Preflight „Abo aktiv“ (`authMethod=claude.ai`,
+`apiKeySource=none`) in 6,1 s, eine Korrektur in 6,0 s. Umlaute und Emojis kamen unverändert zurück.
+
 ### Preflight
 
 1. `claude auth status` (kostet nichts): bei `"loggedIn": false` sofort „nicht angemeldet“.
@@ -81,5 +84,8 @@ beim npm-Paket cross-spawn doppelt mit `^` maskiert (`ClaudeExecutable.BuildComm
 ## Bekannte Einschränkungen
 
 - Jeder Aufruf startet einen eigenen Claude-Code-Prozess; einige Sekunden bis zur Antwort sind normal.
+- Bei einem Enterprise-Konto (`subscriptionType: enterprise`) laufen die Aufrufe über den Sitz der Organisation.
+  Wie sie abgerechnet werden, legt die Organisation fest; die Claude-Code-Startseite kann dabei „API Usage Billing“
+  zeigen, obwohl kein API-Key benutzt wird.
 - Aufrufe über `claude -p` zählen gegen die Nutzungslimits des Abos. Ist das Limit erreicht, scheitert der Aufruf
   mit einer Meldung.
