@@ -13,9 +13,19 @@ public class UiStateTests : IDisposable
     {
         var state = new UiStateStore(_dir.FullName).Load();
 
-        Assert.Equal(464, state.PopupWidth);
-        Assert.Equal(100, state.Scale);
+        Assert.Equal(574, state.PopupWidth);
+        Assert.Equal(125, state.Scale);
         Assert.Null(state.SettingsWindow);
+    }
+
+    [Fact]
+    public void Computed_scale_factor_is_not_written()
+    {
+        var store = new UiStateStore(_dir.FullName);
+        store.Update(s => s.Scale = 150);
+
+        Assert.DoesNotContain("scaleFactor", File.ReadAllText(store.FilePath));
+        Assert.Equal(1.5, store.Current.ScaleFactor);
     }
 
     [Fact]
@@ -53,7 +63,7 @@ public class UiStateTests : IDisposable
     {
         File.WriteAllText(Path.Combine(_dir.FullName, UiStateStore.FileName), "{ kaputt");
 
-        Assert.Equal(100, new UiStateStore(_dir.FullName).Load().Scale);
+        Assert.Equal(UiState.DefaultScale, new UiStateStore(_dir.FullName).Load().Scale);
     }
 
     [Theory]

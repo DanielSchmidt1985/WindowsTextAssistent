@@ -10,7 +10,8 @@ namespace ClaudeHotkey.Core.Config;
 /// </summary>
 public sealed class UiState
 {
-    public const int DefaultPopupWidth = 464;
+    public const int DefaultPopupWidth = 574;
+    public const int DefaultScale = 125;
     public const int MinPopupWidth = 320;
     public const int MaxPopupWidth = 1600;
     public const int MinScale = 75;
@@ -21,11 +22,12 @@ public sealed class UiState
     public int PopupWidth { get; set; } = DefaultPopupWidth;
 
     /// <summary>Scale of text and controls in percent, for all windows.</summary>
-    public int Scale { get; set; } = 100;
+    public int Scale { get; set; } = DefaultScale;
 
     /// <summary>Last bounds of the settings window; null until it was moved or resized once.</summary>
     public WindowBounds? SettingsWindow { get; set; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public double ScaleFactor => Scale / 100.0;
 
     /// <summary>Brings every value into its allowed range (the file can be edited by hand).</summary>

@@ -24,6 +24,22 @@ public class ActionConfigTests : IDisposable
         Assert.Contains("<text>", config.Settings.SystemPrompt);
         Assert.False(config.Actions.Single(a => a.Id == "summarize").Replace);
         Assert.True(config.Actions.Single(a => a.Id == "free").AskInput);
+        Assert.False(config.Settings.Autostart); // a new machine has no Run entry yet
+    }
+
+    [Fact]
+    public void Default_config_carries_the_owners_setup()
+    {
+        var config = ActionConfig.Parse(DefaultConfig.Json());
+        string? Hotkey(string id) => config.Actions.Single(a => a.Id == id).Hotkey;
+        var fix = config.Actions.Single(a => a.Id == "fix");
+
+        Assert.Equal("ctrl+x+x", Hotkey("translate"));
+        Assert.Equal("alt+v+v", Hotkey("improve"));
+        Assert.Equal("alt+k+k", Hotkey("fix"));
+        Assert.Equal("sonnet", fix.EffectiveModel(config.Settings));
+        Assert.Contains("Coaching", fix.Feedback);
+        Assert.Equal("haiku", config.Actions.Single(a => a.Id == "shorter").EffectiveModel(config.Settings));
     }
 
     [Fact]

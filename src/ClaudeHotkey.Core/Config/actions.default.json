@@ -10,9 +10,14 @@
     "claudePath": ""
   },
   "actions": [
-    { "id": "translate", "label": "Übersetzen", "prompt": "Übersetze den Text ins Englische, wenn er deutsch ist, sonst ins Deutsche. Ton, Absätze und Formatierung bleiben erhalten.", "replace": true },
-    { "id": "improve", "label": "Verbessern", "prompt": "Verbessere Ausdruck, Stil und Rechtschreibung. Der Inhalt bleibt vollständig erhalten, die Sprache auch.", "replace": true },
-    { "id": "fix", "label": "Korrigieren", "prompt": "Korrigiere nur Rechtschreibung, Grammatik und Zeichensetzung. Ändere sonst nichts.", "replace": true },
+    { "id": "translate", "label": "Übersetzen", "prompt": "Übersetze den Text ins Englische, wenn er deutsch ist, sonst ins Deutsche. Ton, Absätze und Formatierung bleiben erhalten.", "replace": true, "hotkey": "ctrl+x+x" },
+    { "id": "improve", "label": "Verbessern", "prompt": "Verbessere Ausdruck, Stil und Rechtschreibung. Der Inhalt bleibt vollständig erhalten, die Sprache auch. Sind nur Stichpunkte vorhanden formuliere den Text aus.", "replace": true, "hotkey": "alt+v+v" },
+    {
+      "id": "fix", "label": "Korrigieren",
+      "prompt": "Verbessere Ausdruck, Stil und Rechtschreibung. Der Inhalt bleibt vollständig erhalten, die Sprache auch.",
+      "replace": true, "model": "sonnet", "hotkey": "alt+k+k",
+      "feedback": "Wenn der Text englisch ist: ein kurzes Coaching auf Deutsch zu meinen Fehlern, je Punkt was falsch war, wie es richtig heißt und eine kleine Merkhilfe, damit ich mein Englisch verbessere. Bei deutschen Texten kein Feedback."
+    },
     { "id": "shorter", "label": "Kürzen", "prompt": "Kürze den Text auf etwa die Hälfte, ohne wichtige Aussagen zu verlieren.", "replace": true },
     { "id": "friendly", "label": "Freundlicher", "prompt": "Formuliere den Text freundlicher, ohne den Inhalt zu ändern.", "replace": true },
     { "id": "formal", "label": "Formeller", "prompt": "Formuliere den Text sachlich und formell, ohne den Inhalt zu ändern.", "replace": true },

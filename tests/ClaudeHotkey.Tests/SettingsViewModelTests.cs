@@ -170,8 +170,8 @@ public class SettingsViewModelTests : IDisposable
     public void Scale_and_popup_width_go_to_ui_json()
     {
         var (vm, store) = Create();
-        Assert.Equal("100", vm.Scale);
-        Assert.Equal("464", vm.PopupWidth);
+        Assert.Equal("125", vm.Scale);
+        Assert.Equal("574", vm.PopupWidth);
 
         vm.Scale = "130 %";
         vm.PopupWidth = "720";

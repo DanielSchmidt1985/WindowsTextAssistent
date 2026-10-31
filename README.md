@@ -4,7 +4,7 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Version 1.0.0, alle sieben Phasen des Plans umgesetzt**.
+Stand: **Version 1.0.1, alle sieben Phasen des Plans umgesetzt**.
 
 ## Installation
 
@@ -50,7 +50,7 @@ Nach der Installation von Hand, aus dem Plan:
 - [ ] Nach einem Neustart von Windows läuft das Tool im Tray; „Beenden“ schließt es sauber.
 - [ ] Das Design stimmt mit dem Referenz-Screenshot überein (offen: `docs/neptun-reference.png` fehlt noch).
 
-Automatisch geprüft (`dotnet test`, 200 Tests) sind Konfiguration, CLI-Aufruf, Zwischenablage, Hotkey-Erkennung,
+Automatisch geprüft (`dotnet test`, 202 Tests) sind Konfiguration, CLI-Aufruf, Zwischenablage, Hotkey-Erkennung,
 Ersetzen-Ablauf, Einstellungsdialog, Log, Autostart und Einzelinstanz.
 
 ## Tray
@@ -134,7 +134,14 @@ Hotkeys.
 
 `%APPDATA%\ClaudeHotkey\actions.json` entsteht beim ersten Start aus `src/ClaudeHotkey.Core/Config/actions.default.json`
 (eingebettet in die DLL). Die Datei wird vor jedem Popup neu gelesen, wenn sie sich geändert hat; alle Änderungen
-gelten ohne Neustart.
+gelten ohne Neustart. Eine vorhandene `actions.json` wird bei einem Update nie überschrieben.
+
+Der mitgelieferte Standard ist die eigene Einrichtung des Autors (ab 1.0.1): Hotkeys Strg+X+X (Übersetzen),
+Alt+V+V (Verbessern) und Alt+K+K (Korrigieren, mit `sonnet` und Englisch-Coaching als Feedback), Skalierung 125 %,
+Popup 574 px breit. Autostart ist im Standard aus, weil auf einem neuen Rechner der Registry-Eintrag erst beim
+Speichern entsteht. Soll der Standard später wieder einer eigenen Einrichtung folgen: Aktionen und Einstellungen
+aus `%APPDATA%\ClaudeHotkey\actions.json` nach `actions.default.json` übernehmen (ohne `autostart`, `model` nur
+wo es vom Standardmodell abweicht), Werte aus `ui.json` in `UiState.DefaultScale`/`DefaultPopupWidth`.
 
 - Erlaubt sind Kommentare (`//`) und Kommas am Ende.
 - Geprüft wird: eindeutige `id`, nicht leerer `prompt`, `askInput` nur mit `{input}` im Prompt, gültige und nicht
