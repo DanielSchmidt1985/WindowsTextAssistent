@@ -45,6 +45,9 @@ Das Popup öffnet sich an der Maus.
 - **Kopieren** legt das Ergebnis in die Zwischenablage und schließt das Popup.
 - **Ersetzen** (oder **Enter**) setzt das Ergebnis anstelle der Markierung ins Quellfenster ein. Nur bei Aktionen mit
   `"replace": true`. Danach steht die Zwischenablage wieder so wie vor dem Ersetzen.
+- **Feedback:** Hat eine Aktion ein `feedback`, steht unter dem Ergebnis ein Bereich „Feedback“ (z. B. ein
+  Sprach-Coaching). Er ist nur zum Lesen: Ersetzen und Kopieren nehmen ausschließlich das Ergebnis. Ohne Feedback
+  (etwa bei deutschem Text, wenn das Coaching nur für Englisch gedacht ist) bleibt der Bereich weg.
 - Bei Fehlern steht eine kurze Meldung im Popup, die Rohausgabe der CLI unter „Details“, dazu „Erneut versuchen“.
 - Ein neuer Auslöser ersetzt ein offenes Popup und bricht dessen Aufruf ab.
 
@@ -95,7 +98,7 @@ Plan gibt es `HoverBrush`, `PressedBrush` und `SelectionBrush`.
 
 Zum Vergleichen mit dem Referenz-Screenshot öffnet `ClaudeHotkey.exe --demo <zustand>` das Popup mit Beispieltext,
 ohne Hook und ohne Claude-Aufruf. Zustände: `choose`, `input`, `running`, `result`, `error`, `nocapture`,
-`replacefail`. Den Einstellungsdialog zeigen `settings`, `settings-general`, `settings-errors` und `settings-test`;
+`replacefail`, `feedback`. Den Einstellungsdialog zeigen `settings`, `settings-general`, `settings-errors` und `settings-test`;
 sie arbeiten auf einer Kopie in `%TEMP%\ClaudeHotkey-demo`, nie auf der echten `actions.json`.
 
 ## Voraussetzungen
@@ -201,6 +204,21 @@ Scheitert ein Schritt, kommt das Popup mit einer Meldung zurück; das Ergebnis b
 sich das Fenster nicht aktivieren, bleibt das Ergebnis zusätzlich in der Zwischenablage, um es selbst einzufügen.
 
 Fügt ein langsames Programm noch den alten Inhalt ein, `pasteDelayMs` in `actions.json` erhöhen (100–5000).
+
+## Feedback
+
+Pro Aktion optional: `"feedback": "Wenn der Text englisch ist: kurzes Coaching zu meinen Fehlern …"` (in den
+Einstellungen „Zusätzliches Feedback“). Der Prompt bleibt dann rein bei der Aufgabe.
+
+- Der Aufruf bekommt zusätzlich `--json-schema` mit einem Objekt `{ "text": …, "feedback": … }`. Die CLI prüft das
+  Format und liefert das Objekt in `structured_output` (geprüft mit Claude Code 2.1.240). Fehlt es, wird `result`
+  als JSON gelesen; ist auch das kein Objekt, gilt die ganze Antwort als Text, wie ohne Feedback.
+- Der System-Prompt sagt „ohne Erklärung“. Deshalb hängt das Tool eine Anweisung an: `text` nur das Ergebnis,
+  Erklärungen ausschließlich in `feedback`, leer nur wenn es nichts zu sagen gibt.
+- Strukturierte Ausgabe braucht in der CLI einen zweiten Durchgang: ein Aufruf dauerte im Test 9–13 s statt etwa 6 s.
+- Inhaltlich ist das Feedback so gut wie das Modell. Haiku hat im Test eine falsche Merkhilfe geliefert; für ein
+  Coaching, dem man vertrauen will, ist `sonnet` als Modell der Aktion die bessere Wahl.
+- `tools/ClaudeHotkey.CliCheck --feedback "<Anweisung>" "<Text>"` probiert das ohne App aus.
 
 ## Doppeldruck-Hotkeys
 

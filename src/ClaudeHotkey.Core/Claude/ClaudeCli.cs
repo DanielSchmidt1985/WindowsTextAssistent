@@ -18,11 +18,18 @@ public enum ClaudeErrorKind
 /// <param name="ActionPrompt">Instruction of the chosen action, e.g. "Korrigiere ...".</param>
 /// <param name="Text">The selected text. Sent over stdin, never as an argument.</param>
 /// <param name="SystemPrompt">General rules from the settings; the action prompt is appended to it.</param>
-public sealed record ClaudeRequest(string ActionPrompt, string Text, string Model, string? SystemPrompt, TimeSpan Timeout);
+/// <param name="FeedbackInstruction">
+/// Optional: what Claude should say besides the result (e.g. language coaching). Then the answer
+/// is requested as structured output with separate "text" and "feedback" fields.
+/// </param>
+public sealed record ClaudeRequest(
+    string ActionPrompt, string Text, string Model, string? SystemPrompt, TimeSpan Timeout, string? FeedbackInstruction = null);
 
+/// <param name="Text">The result that may replace the selection.</param>
 /// <param name="Message">Short German message for the UI; null on success.</param>
 /// <param name="Details">Raw CLI output for the "Details" section; null on success.</param>
-public sealed record ClaudeResult(ClaudeErrorKind Error, string? Text, string? Message, string? Details)
+/// <param name="Feedback">Only for reading, never pasted; null when the action asks for none or Claude had nothing to say.</param>
+public sealed record ClaudeResult(ClaudeErrorKind Error, string? Text, string? Message, string? Details, string? Feedback = null)
 {
     public bool Success => Error == ClaudeErrorKind.None;
 }
@@ -75,17 +82,35 @@ public sealed class ClaudeCli
 
     public static string DefaultWorkingDirectory() => Path.Combine(Path.GetTempPath(), "ClaudeHotkey", "work");
 
-    public static IReadOnlyList<string> BuildArguments(ClaudeRequest request) =>
-    [
-        "-p",
-        "--model", request.Model,
-        "--output-format", "json",
-        "--system-prompt", BuildSystemPrompt(request),
-        "--no-session-persistence",
-        "--strict-mcp-config",
-        // Last on purpose: --tools takes a variadic list and would swallow following arguments.
-        "--tools", "",
-    ];
+    /// <summary>
+    /// Structured output for actions with feedback. The CLI validates the answer against it and
+    /// returns the object in "structured_output" (checked with Claude Code 2.1.240).
+    /// </summary>
+    public const string FeedbackSchema =
+        """{"type":"object","properties":{"text":{"type":"string"},"feedback":{"type":"string"}},"required":["text","feedback"],"additionalProperties":false}""";
+
+    private static bool WantsFeedback(ClaudeRequest request) => !string.IsNullOrWhiteSpace(request.FeedbackInstruction);
+
+    public static IReadOnlyList<string> BuildArguments(ClaudeRequest request)
+    {
+        var arguments = new List<string>
+        {
+            "-p",
+            "--model", request.Model,
+            "--output-format", "json",
+            "--system-prompt", BuildSystemPrompt(request),
+        };
+        if (WantsFeedback(request))
+            arguments.AddRange(["--json-schema", FeedbackSchema]);
+        arguments.AddRange(
+        [
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            // Last on purpose: --tools takes a variadic list and would swallow following arguments.
+            "--tools", "",
+        ]);
+        return arguments;
+    }
 
     public static string BuildSystemPrompt(ClaudeRequest request)
     {
@@ -93,6 +118,16 @@ public sealed class ClaudeCli
         if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
             builder.Append(request.SystemPrompt.Trim()).Append("\n\n");
         builder.Append("Aufgabe:\n").Append(request.ActionPrompt.Trim());
+        if (WantsFeedback(request))
+        {
+            // Spelled out because the general system prompt forbids explanations: without this
+            // the model either drops the feedback or mixes it into the result.
+            builder.Append("\n\nAntwortformat: ein Objekt mit zwei Feldern.\n")
+                .Append("„text“: nur das Ergebnis der Aufgabe, genau so, wie es den markierten Text ersetzen soll, ohne Erklärung.\n")
+                .Append("„feedback“: ").Append(request.FeedbackInstruction!.Trim()).Append('\n')
+                .Append("Erklärungen und Hinweise gehören ausschließlich in „feedback“. ")
+                .Append("Nur wenn es nach dieser Anweisung wirklich nichts zu sagen gibt, ist „feedback“ ein leerer String.");
+        }
         return builder.ToString();
     }
 
@@ -115,11 +150,43 @@ public sealed class ClaudeCli
         if (parsed.IsError || output.ExitCode != 0)
             return Fail(Classify(parsed.Result, parsed.ApiErrorStatus) ?? ClaudeErrorKind.Failed, CombineOutput(output));
 
-        var text = CleanResponse(parsed.Result);
+        var (answer, feedback) = WantsFeedback(request) ? SplitFeedback(parsed) : (parsed.Result, null);
+        var text = CleanResponse(answer);
         return text.Length == 0
             ? Fail(ClaudeErrorKind.EmptyResponse, CombineOutput(output))
-            : new ClaudeResult(ClaudeErrorKind.None, text, null, null);
+            : new ClaudeResult(ClaudeErrorKind.None, text, null, null, feedback);
     }
+
+    /// <summary>
+    /// Text and feedback from a structured answer: "structured_output" first, then "result" as
+    /// JSON. If neither holds the object, the whole answer counts as text (as without feedback).
+    /// </summary>
+    internal static (string Text, string? Feedback) SplitFeedback(ParsedResult parsed)
+    {
+        if (parsed.StructuredText is { } structured)
+            return (structured, NullIfEmpty(parsed.StructuredFeedback));
+        try
+        {
+            using var document = JsonDocument.Parse(parsed.Result.Trim());
+            if (ReadTextAndFeedback(document.RootElement) is { } fromResult)
+                return (fromResult.Text, NullIfEmpty(fromResult.Feedback));
+        }
+        catch (JsonException)
+        {
+        }
+        return (parsed.Result, null);
+    }
+
+    private static (string Text, string? Feedback)? ReadTextAndFeedback(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object
+            || !element.TryGetProperty("text", out var text) || text.ValueKind != JsonValueKind.String)
+            return null;
+        var feedback = element.TryGetProperty("feedback", out var f) && f.ValueKind == JsonValueKind.String ? f.GetString() : null;
+        return (text.GetString()!, feedback);
+    }
+
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>
     /// Checks login and credential source: <c>claude auth status</c> first (free), then one short
@@ -215,7 +282,8 @@ public sealed class ClaudeCli
     private static PreflightResult PreflightFail(ClaudeErrorKind kind, string? authMethod, string? apiKeySource, string? details) =>
         new(kind, false, authMethod, apiKeySource, MessageFor(kind), details);
 
-    internal sealed record ParsedResult(bool IsError, string Result, int? ApiErrorStatus);
+    /// <param name="StructuredText">"text" of "structured_output", only with --json-schema.</param>
+    internal sealed record ParsedResult(bool IsError, string Result, int? ApiErrorStatus, string? StructuredText = null, string? StructuredFeedback = null);
 
     /// <summary>Reads the single JSON object of <c>--output-format json</c>; the answer is in <c>result</c>.</summary>
     internal static bool TryParseResult(string stdout, out ParsedResult parsed)
@@ -242,7 +310,9 @@ public sealed class ClaudeCli
         int? status = root.TryGetProperty("api_error_status", out var statusElement) && statusElement.ValueKind == JsonValueKind.Number
             ? statusElement.GetInt32()
             : null;
-        parsed = new ParsedResult(isError, result.ValueKind == JsonValueKind.String ? result.GetString() ?? "" : result.ToString(), status);
+        var structured = root.TryGetProperty("structured_output", out var s) ? ReadTextAndFeedback(s) : null;
+        parsed = new ParsedResult(isError, result.ValueKind == JsonValueKind.String ? result.GetString() ?? "" : result.ToString(), status,
+            structured?.Text, structured?.Feedback);
         return true;
     }
 

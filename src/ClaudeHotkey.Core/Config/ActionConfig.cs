@@ -40,6 +40,12 @@ public sealed class ActionDefinition
     /// <summary>Runs the action directly on the selected text.</summary>
     public string? Hotkey { get; set; }
 
+    /// <summary>
+    /// Optional: what Claude should say besides the result, e.g. language coaching. Shown in the
+    /// popup below the result, never pasted.
+    /// </summary>
+    public string? Feedback { get; set; }
+
     public bool Enabled { get; set; } = true;
 
     public string EffectiveModel(AppSettings settings) => string.IsNullOrWhiteSpace(Model) ? settings.Model : Model.Trim();

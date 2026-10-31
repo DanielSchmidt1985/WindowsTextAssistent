@@ -17,6 +17,8 @@ public sealed class ActionEditorViewModel : ObservableObject
     private bool _replace;
     private bool _askInput;
     private string _hotkey;
+    private string _feedback;
+    private string _testFeedback = "";
     private bool _enabled;
     private bool _isNew;
     private string _testText = "Das ist ein kurtzer Beispieltext, mit dem sich die Aktion ausprobieren lässt.";
@@ -42,6 +44,7 @@ public sealed class ActionEditorViewModel : ObservableObject
         _replace = source.Replace;
         _askInput = source.AskInput;
         _hotkey = source.Hotkey ?? "";
+        _feedback = source.Feedback ?? "";
         _enabled = source.Enabled;
         _isNew = isNew;
 
@@ -105,6 +108,13 @@ public sealed class ActionEditorViewModel : ObservableObject
         set => Set(ref _hotkey, value);
     }
 
+    /// <summary>Optional instruction for feedback besides the result; empty = none.</summary>
+    public string Feedback
+    {
+        get => _feedback;
+        set => Set(ref _feedback, value);
+    }
+
     public bool Enabled
     {
         get => _enabled;
@@ -130,6 +140,7 @@ public sealed class ActionEditorViewModel : ObservableObject
         Replace = Replace,
         AskInput = AskInput,
         Hotkey = string.IsNullOrWhiteSpace(Hotkey) ? null : Hotkey.Trim(),
+        Feedback = string.IsNullOrWhiteSpace(Feedback) ? null : Feedback.Trim(),
         Enabled = Enabled,
     };
 
@@ -156,6 +167,12 @@ public sealed class ActionEditorViewModel : ObservableObject
     {
         get => _testResult;
         private set => Set(ref _testResult, value);
+    }
+
+    public string TestFeedback
+    {
+        get => _testFeedback;
+        private set => Set(ref _testFeedback, value);
     }
 
     public string TestError
@@ -188,9 +205,11 @@ public sealed class ActionEditorViewModel : ObservableObject
             TestText,
             definition.EffectiveModel(settings),
             settings.SystemPrompt,
-            TimeSpan.FromSeconds(settings.TimeoutSeconds));
+            TimeSpan.FromSeconds(settings.TimeoutSeconds),
+            definition.Feedback);
 
         TestResult = "";
+        TestFeedback = "";
         TestError = "";
         IsTesting = true;
         using var testing = new CancellationTokenSource();
@@ -199,7 +218,10 @@ public sealed class ActionEditorViewModel : ObservableObject
         {
             var result = await _run(request, testing.Token);
             if (result.Success)
+            {
                 TestResult = result.Text!;
+                TestFeedback = result.Feedback ?? "";
+            }
             else
                 TestError = result.Message ?? ClaudeCli.MessageFor(result.Error);
         }

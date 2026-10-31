@@ -230,6 +230,22 @@ public class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Feedback_is_saved_and_used_by_test()
+    {
+        var (vm, store) = Create();
+        var fix = vm.Actions.Single(a => a.Id == "fix");
+        fix.Feedback = "  Kurzes Coaching bei englischen Texten.  ";
+
+        Assert.True(vm.Save());
+        Assert.Equal("Kurzes Coaching bei englischen Texten.", store.Current.Actions.Single(a => a.Id == "fix").Feedback);
+        Assert.Null(store.Current.Actions.Single(a => a.Id == "translate").Feedback);
+
+        fix.TestCommand.Execute(null);
+        await Task.Delay(50);
+        Assert.Equal("Kurzes Coaching bei englischen Texten.", Assert.Single(_requests).FeedbackInstruction);
+    }
+
+    [Fact]
     public async Task Test_fills_input_placeholder()
     {
         var (vm, _) = Create();

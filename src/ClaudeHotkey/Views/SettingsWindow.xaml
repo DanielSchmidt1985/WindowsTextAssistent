@@ -107,6 +107,11 @@
                                        Text="Der markierte Text wird getrennt übergeben. {input} wird durch die Eingabe im Popup ersetzt (mit „Eingabefeld im Popup“)." />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding Errors[prompt]}" />
 
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zusätzliches Feedback (optional)" />
+                            <TextBox Style="{StaticResource Multiline}" Height="60" Text="{Binding Feedback, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="Was Claude außer dem Ergebnis sagen soll, z. B. ein Coaching zu den Fehlern. Steht im Popup unter dem Ergebnis und wird nie eingefügt. Kostet einige Sekunden mehr." />
+
                             <Grid Margin="0,0,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -154,6 +159,14 @@
                                                  Visibility="{Binding IsTesting, Converter={StaticResource BoolToVisibility}}" />
                                     <TextBox Style="{StaticResource ReadOnlyText}" Text="{Binding TestResult, Mode=OneWay}" Margin="0,8,0,0"
                                              MaxHeight="200" Visibility="{Binding TestResult, Converter={StaticResource NonEmptyToVisible}}" />
+                                    <Border Margin="0,8,0,0" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2,0,0,0" Padding="10,0,0,0"
+                                            Visibility="{Binding TestFeedback, Converter={StaticResource NonEmptyToVisible}}">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource Muted}" Text="FEEDBACK" FontSize="11" FontWeight="SemiBold" />
+                                            <TextBox Style="{StaticResource ReadOnlyText}" Text="{Binding TestFeedback, Mode=OneWay}" Margin="-4,2,0,0"
+                                                     MaxHeight="200" Background="Transparent" BorderThickness="0" Padding="4,2" />
+                                        </StackPanel>
+                                    </Border>
                                     <TextBlock Style="{StaticResource FieldError}" Text="{Binding TestError}" Margin="0,8,0,0" />
                                 </StackPanel>
                             </Border>

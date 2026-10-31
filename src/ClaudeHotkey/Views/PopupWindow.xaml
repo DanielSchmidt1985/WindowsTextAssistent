@@ -70,6 +70,16 @@
             <TextBox Style="{StaticResource ReadOnlyText}" Text="{Binding ResultText, Mode=OneWay}" Margin="0,4,0,0"
                      MaxHeight="320" Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
 
+            <!-- Feedback: for reading only, "Ersetzen" and "Kopieren" take the result above -->
+            <Border Margin="0,10,0,0" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2,0,0,0" Padding="10,0,0,0"
+                    Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Muted}" Text="FEEDBACK" FontSize="11" FontWeight="SemiBold" />
+                    <TextBox Style="{StaticResource ReadOnlyText}" Text="{Binding FeedbackText, Mode=OneWay}" Margin="-4,2,0,0"
+                             MaxHeight="220" Background="Transparent" BorderThickness="0" Padding="4,2" />
+                </StackPanel>
+            </Border>
+
             <!-- Error -->
             <StackPanel Margin="0,8,0,0" Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />

@@ -379,6 +379,15 @@ public partial class App : Application
         PopupViewModel.RunClaude run = state switch
         {
             "running" => async (_, token) => { await Task.Delay(Timeout.Infinite, token); return null!; },
+            "feedback" => async (_, _) =>
+            {
+                await Task.Delay(300);
+                return new ClaudeResult(ClaudeErrorKind.None,
+                    "I would like to schedule a meeting with you tomorrow.", null, null,
+                    "• „make a meeting“ → „schedule a meeting“: Termine werden „scheduled“ oder „arranged“.\n" +
+                    "• „I want make“ → „I would like to“: nach „want“ steht „to“, „would like“ klingt höflicher.\n" +
+                    "• „tomorow“ → „tomorrow“: zwei r, ein w.");
+            },
             "error" => (_, _) => Task.FromResult(new ClaudeResult(ClaudeErrorKind.NotLoggedIn, null,
                 ClaudeCli.MessageFor(ClaudeErrorKind.NotLoggedIn),
                 "Exit-Code: 1\n\nstdout:\n{\"is_error\":true,\"result\":\"Failed to authenticate: OAuth session expired\"}")),
@@ -405,6 +414,7 @@ public partial class App : Application
             {
                 case "input": viewModel.TryRunShortcut("8"); break;
                 case "running" or "result" or "error": viewModel.TryRunShortcut("2"); break;
+                case "feedback": viewModel.TryRunShortcut("3"); break;
                 case "replacefail":
                     viewModel.TryRunShortcut("2");
                     viewModel.ReplaceError = TextReplacer.ActivateFailedMessage;

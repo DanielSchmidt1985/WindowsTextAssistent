@@ -39,6 +39,88 @@ public class ClaudeCliTests
         Assert.Equal("<text>\nHallo Welt\n</text>", request.StandardInput);
     }
 
+    private static ClaudeRequest FeedbackRequest() =>
+        new("Korrigiere den Text.", "I want make a meeting.", "haiku", "Antworte nur mit dem Ergebnis.", TimeSpan.FromSeconds(30),
+            "Kurzes Coaching zu den Fehlern.");
+
+    private static string StructuredJson(string result, string? structured) =>
+        $$"""{"type":"result","is_error":false,"result":{{System.Text.Json.JsonSerializer.Serialize(result)}}{{(structured is null ? "" : $",\"structured_output\":{structured}")}}}""";
+
+    [Fact]
+    public async Task Feedback_adds_json_schema_and_answer_format()
+    {
+        var (cli, runner) = Create((_, _) => Ok(StructuredJson("", """{"text":"x","feedback":""}""")));
+
+        await cli.RunAsync(FeedbackRequest());
+
+        var arguments = runner.Requests[0].Arguments;
+        var schemaIndex = arguments.ToList().IndexOf("--json-schema");
+        Assert.True(schemaIndex > 0);
+        Assert.Equal(ClaudeCli.FeedbackSchema, arguments[schemaIndex + 1]);
+        Assert.Equal(["--tools", ""], arguments.TakeLast(2)); // --tools must stay last
+        var systemPrompt = arguments[arguments.ToList().IndexOf("--system-prompt") + 1];
+        Assert.Contains("„feedback“: Kurzes Coaching zu den Fehlern.", systemPrompt);
+        Assert.Contains("ausschließlich in „feedback“", systemPrompt);
+    }
+
+    [Fact]
+    public async Task Without_feedback_there_is_no_schema()
+    {
+        var (cli, runner) = Create((_, _) => Ok(ResultJson("x")));
+
+        await cli.RunAsync(Request());
+
+        Assert.DoesNotContain("--json-schema", runner.Requests[0].Arguments);
+    }
+
+    [Fact]
+    public async Task Structured_output_is_split_into_text_and_feedback()
+    {
+        // Shape taken from a real run with --json-schema (Claude Code 2.1.240).
+        var (cli, _) = Create((_, _) => Ok(StructuredJson(
+            """{"text":"I want to make a meeting.","feedback":"Nach want kommt to."}""",
+            """{"text":"I want to make a meeting.","feedback":"Nach want kommt to."}""")));
+
+        var result = await cli.RunAsync(FeedbackRequest());
+
+        Assert.True(result.Success);
+        Assert.Equal("I want to make a meeting.", result.Text);
+        Assert.Equal("Nach want kommt to.", result.Feedback);
+    }
+
+    [Fact]
+    public async Task Empty_feedback_becomes_null()
+    {
+        var (cli, _) = Create((_, _) => Ok(StructuredJson("", """{"text":"Hallo Welt.","feedback":"  "}""")));
+
+        var result = await cli.RunAsync(FeedbackRequest());
+
+        Assert.Equal("Hallo Welt.", result.Text);
+        Assert.Null(result.Feedback);
+    }
+
+    [Fact]
+    public async Task Json_in_result_is_used_when_structured_output_is_missing()
+    {
+        var (cli, _) = Create((_, _) => Ok(StructuredJson("""{"text":"Korrigiert.","feedback":"Tipp."}""", null)));
+
+        var result = await cli.RunAsync(FeedbackRequest());
+
+        Assert.Equal("Korrigiert.", result.Text);
+        Assert.Equal("Tipp.", result.Feedback);
+    }
+
+    [Fact]
+    public async Task Plain_answer_counts_as_text_when_no_object_comes_back()
+    {
+        var (cli, _) = Create((_, _) => Ok(StructuredJson("Einfach nur Text.", null)));
+
+        var result = await cli.RunAsync(FeedbackRequest());
+
+        Assert.Equal("Einfach nur Text.", result.Text);
+        Assert.Null(result.Feedback);
+    }
+
     [Fact]
     public async Task Selected_text_never_appears_in_arguments()
     {

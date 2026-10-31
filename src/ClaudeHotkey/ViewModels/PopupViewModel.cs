@@ -117,6 +117,7 @@ public sealed class PopupViewModel : ObservableObject
             OnPropertyChanged(nameof(IsRunning));
             OnPropertyChanged(nameof(IsAskingInput));
             OnPropertyChanged(nameof(HasResult));
+            OnPropertyChanged(nameof(HasFeedback));
             OnPropertyChanged(nameof(HasError));
             OnPropertyChanged(nameof(CanReplace));
             OnPropertyChanged(nameof(CanRetry));
@@ -160,6 +161,21 @@ public sealed class PopupViewModel : ObservableObject
         get => _resultText;
         private set => Set(ref _resultText, value);
     }
+
+    private string? _feedbackText;
+
+    /// <summary>Feedback of the action (e.g. language coaching); shown, never copied or pasted.</summary>
+    public string? FeedbackText
+    {
+        get => _feedbackText;
+        private set
+        {
+            if (Set(ref _feedbackText, value))
+                OnPropertyChanged(nameof(HasFeedback));
+        }
+    }
+
+    public bool HasFeedback => HasResult && !string.IsNullOrEmpty(FeedbackText);
 
     public string ErrorMessage
     {
@@ -247,7 +263,8 @@ public sealed class PopupViewModel : ObservableObject
             _sourceText,
             definition.EffectiveModel(_settings),
             _settings.SystemPrompt,
-            TimeSpan.FromSeconds(_settings.TimeoutSeconds));
+            TimeSpan.FromSeconds(_settings.TimeoutSeconds),
+            definition.Feedback);
 
         ClaudeResult result;
         var started = System.Diagnostics.Stopwatch.StartNew();
@@ -268,6 +285,7 @@ public sealed class PopupViewModel : ObservableObject
         if (result.Success)
         {
             ResultText = result.Text!;
+            FeedbackText = result.Feedback;
             ErrorDetails = null;
             State = PopupState.Result;
         }
