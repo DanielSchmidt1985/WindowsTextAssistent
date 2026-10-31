@@ -4,16 +4,33 @@ using System.Windows.Input;
 
 namespace ClaudeHotkey.Views;
 
+/// <summary>Turns two quick presses of the same combination into a double press ("ctrl+x" → "ctrl+x+x").</summary>
+public static class HotkeyCaptureRules
+{
+    public const int DoublePressWindowMs = 600;
+
+    /// <param name="previousCombo">The combination of the press before, or null.</param>
+    /// <returns>The text for the box: <paramref name="combo"/>, or its double press.</returns>
+    public static string Combine(string? previousCombo, long previousMs, string combo, long nowMs) =>
+        previousCombo == combo && nowMs - previousMs <= DoublePressWindowMs
+            ? $"{combo}+{combo[(combo.LastIndexOf('+') + 1)..]}"
+            : combo;
+}
+
 /// <summary>
-/// Text box that records the pressed key combination ("ctrl+alt+k") instead of typing.
-/// Backspace or Delete clears it, Tab moves on. While it has focus the app's global hotkeys are
-/// suspended (<see cref="CaptureStarted"/>/<see cref="CaptureEnded"/>), otherwise an already
-/// registered combination would never reach the box.
+/// Text box that records the pressed key combination ("ctrl+alt+k") instead of typing; pressing
+/// it twice quickly records a double press ("ctrl+x+x"). Backspace or Delete clears it, Tab moves
+/// on. While it has focus the app's global hotkeys are suspended
+/// (<see cref="CaptureStarted"/>/<see cref="CaptureEnded"/>), otherwise an already registered
+/// combination would never reach the box.
 /// </summary>
 public sealed class HotkeyTextBox : TextBox
 {
     public static event EventHandler? CaptureStarted;
     public static event EventHandler? CaptureEnded;
+
+    private string? _previousCombo;
+    private long _previousMs;
 
     public HotkeyTextBox()
     {
@@ -44,8 +61,11 @@ public sealed class HotkeyTextBox : TextBox
             return; // keep normal focus navigation
 
         e.Handled = true;
+        if (e.IsRepeat)
+            return; // holding the key is not a second press
         if (key is Key.Back or Key.Delete && modifiers == ModifierKeys.None)
         {
+            _previousCombo = null;
             SetText("");
             return;
         }
@@ -58,7 +78,14 @@ public sealed class HotkeyTextBox : TextBox
         if (modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("shift");
         if (modifiers.HasFlag(ModifierKeys.Windows)) parts.Add("win");
         parts.Add(name);
-        SetText(string.Join('+', parts));
+        var combo = string.Join('+', parts);
+
+        var now = Environment.TickCount64;
+        var text = HotkeyCaptureRules.Combine(_previousCombo, _previousMs, combo, now);
+        // After a double press, the next press starts over with a single one.
+        _previousCombo = text == combo ? combo : null;
+        _previousMs = now;
+        SetText(text);
     }
 
     private void SetText(string text)

@@ -123,7 +123,7 @@
                                     <TextBlock Style="{StaticResource FieldLabel}" Text="Eigener Hotkey (optional)" />
                                     <local:HotkeyTextBox Style="{StaticResource {x:Type TextBox}}" Text="{Binding Hotkey}" />
                                     <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                               Text="Anklicken, Kombination drücken; Entf löscht. Führt die Aktion direkt aus." />
+                                               Text="Anklicken und Kombination drücken, für Doppeldruck die Taste zweimal (z. B. Strg+X+X). Entf löscht. Führt die Aktion direkt aus." />
                                     <TextBlock Style="{StaticResource FieldError}" Text="{Binding Errors[hotkey]}" />
                                 </StackPanel>
                             </Grid>
@@ -173,7 +173,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zeitfenster für Strg+C+C (ms)" Margin="0,0,0,4" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zeitfenster für Doppeldruck wie Strg+C+C (ms)" Margin="0,0,0,4" />
                             <TextBox Text="{Binding DoubleCopyMs, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[doubleCopyMs]}" />
 
@@ -188,8 +188,10 @@
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[pasteDelayMs]}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zweiter Hotkey" Margin="0,0,0,4" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zweiter Hotkey (optional)" Margin="0,0,0,4" />
                             <local:HotkeyTextBox Style="{StaticResource {x:Type TextBox}}" Text="{Binding SecondHotkey}" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="Kopiert selbst und öffnet das Popup. Doppeldruck möglich, Entf = keiner." />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[secondHotkey]}" />
 
                             <TextBlock Style="{StaticResource FieldLabel}" Text="Timeout (Sekunden)" />

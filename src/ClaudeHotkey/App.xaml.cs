@@ -77,7 +77,13 @@ public partial class App : Application
         _capture = new TextCapture(new SystemClipboard(_clipboard), new KeyboardInput());
 
         _hook = new KeyboardHook(settings.DoubleCopyMs);
-        _hook.DoubleCopy += (_, args) => Capture("double-copy", () => _capture.AfterUserCopyAsync(args.ClipboardSequence), null);
+        _hook.DoublePress += (_, args) =>
+        {
+            if (args.Gesture == HotkeyGesture.DoubleCopy)
+                Capture("double-copy", () => _capture.AfterUserCopyAsync(args.ClipboardSequence), null);
+            else if (_hotkeyTargets.TryGetValue(args.Gesture, out var actionId))
+                Capture(actionId is null ? "second-hotkey" : "action-hotkey", () => CaptureForDoublePress(args), actionId);
+        };
 
         _hotkeys = new GlobalHotkeys();
         _hotkeys.Pressed += (_, gesture) =>
@@ -117,7 +123,19 @@ public partial class App : Application
         _tray?.SetStatus(string.Join(" · ", parts), _claudeWarning || _hotkeyWarning || _configWarning);
     }
 
-    /// <summary>(Re)registers the second hotkey and the hotkeys of all active actions from the current config.</summary>
+    /// <summary>
+    /// A configured double press other than Ctrl+C+C. With Ctrl+X+X the app has already cut the
+    /// text into the clipboard, like Ctrl+C+C copies it; for any other key the tool copies itself.
+    /// </summary>
+    private Task<CaptureResult> CaptureForDoublePress(DoublePressEventArgs args) =>
+        args.Gesture is { VirtualKey: 'X', Modifiers: HotkeyModifiers.Ctrl }
+            ? _capture!.AfterUserCopyAsync(args.ClipboardSequence)
+            : _capture!.BySendingCopyAsync(args.Gesture.VirtualKey);
+
+    /// <summary>
+    /// (Re)registers the second hotkey and the hotkeys of all active actions from the current
+    /// config: single presses with RegisterHotKey, double presses in the keyboard hook.
+    /// </summary>
     private void RegisterHotkeys(bool notifyWhenTaken)
     {
         if (_hotkeys is null)
@@ -126,21 +144,32 @@ public partial class App : Application
         _hotkeyTargets.Clear();
 
         var config = _config.Current;
-        var wanted = new List<(string Text, string? ActionId, string Name)> { (config.Settings.SecondHotkey, null, "zweiter Hotkey") };
+        var wanted = new List<(string Text, string? ActionId, string Name)>();
+        if (!string.IsNullOrWhiteSpace(config.Settings.SecondHotkey))
+            wanted.Add((config.Settings.SecondHotkey, null, "zweiter Hotkey"));
         wanted.AddRange(config.EnabledActions
             .Where(a => !string.IsNullOrWhiteSpace(a.Hotkey))
             .Select(a => (a.Hotkey!, (string?)a.Id, $"„{a.Label}“")));
 
         var taken = new List<string>();
+        var doublePresses = new List<HotkeyGesture> { HotkeyGesture.DoubleCopy };
         foreach (var (text, actionId, name) in wanted)
         {
             if (!HotkeyGesture.TryParse(text, out var gesture))
                 continue; // validation already rejected it; nothing to register
-            if (_hotkeys.TryRegister(gesture))
+            if (gesture.IsDoublePress)
+            {
+                // Only our hook sees these, so they cannot be taken by another program.
+                doublePresses.Add(gesture);
+                _hotkeyTargets[gesture] = actionId;
+            }
+            else if (_hotkeys.TryRegister(gesture))
                 _hotkeyTargets[gesture] = actionId;
             else
                 taken.Add($"{gesture} ({name})");
         }
+        if (_hook is not null)
+            _hook.Gestures = doublePresses;
 
         _hotkeyWarning = taken.Count > 0;
         _hotkeyStatus = _hotkeyWarning ? $"belegt: {string.Join(", ", taken)}" : "";
@@ -158,7 +187,7 @@ public partial class App : Application
     private void ApplyConfig(bool notify)
     {
         if (_hook is not null)
-            _hook.DoubleCopyMilliseconds = _config.Current.Settings.DoubleCopyMs;
+            _hook.DoublePressMilliseconds = _config.Current.Settings.DoubleCopyMs;
         RegisterHotkeys(notify);
     }
 

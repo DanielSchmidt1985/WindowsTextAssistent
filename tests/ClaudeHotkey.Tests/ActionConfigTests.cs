@@ -77,6 +77,9 @@ public class ActionConfigTests : IDisposable
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "shift+x" }""", "keine gültige")]
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+1" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "Strg+Alt+1" }""", "schon für „A“")]
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+space" }""", "schon für den zweiten Hotkey")]
+    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+c+c" }""", "schon für Strg+C+C")]
+    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+c" }""", "schon für Strg+C+C")]
+    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+x" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "ctrl+x+x" }""", "schon für „A“")]
     public void Invalid_actions_are_rejected(string actions, string expected)
     {
         var ex = Assert.Throws<ActionConfigException>(() => ActionConfig.Parse(Json(actions)));
@@ -94,6 +97,35 @@ public class ActionConfigTests : IDisposable
         var ex = Assert.Throws<ActionConfigException>(() => ActionConfig.Parse(Json("", settings)));
 
         Assert.Contains(ex.Errors, e => e.Contains(expected));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Second_hotkey_may_be_empty(string value)
+    {
+        var config = ActionConfig.Parse(Json("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+space" }""",
+            $"\"secondHotkey\": \"{value}\""));
+
+        Assert.Equal("ctrl+alt+space", config.Actions[0].Hotkey); // free for an action now
+    }
+
+    [Fact]
+    public void Double_press_hotkeys_are_accepted()
+    {
+        var config = ActionConfig.Parse(Json(
+            """{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+x+x" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "ctrl+alt+q+q" }""",
+            "\"secondHotkey\": \"ctrl+y+y\""));
+
+        Assert.Equal(2, config.Actions.Count);
+    }
+
+    [Fact]
+    public void Second_hotkey_on_ctrl_c_c_is_rejected()
+    {
+        var ex = Assert.Throws<ActionConfigException>(() => ActionConfig.Parse(Json("", "\"secondHotkey\": \"ctrl+c+c\"")));
+
+        Assert.Contains(ex.Errors, e => e.Contains("Strg+C+C"));
     }
 
     [Fact]

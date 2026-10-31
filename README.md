@@ -60,6 +60,9 @@ Der Dialog schreibt dieselbe `actions.json`, die sich auch von Hand bearbeiten l
 - **Eigener Hotkey:** Feld anklicken und die Kombination drücken, Entf oder Rücktaste löscht. Solange das Feld den
   Fokus hat, sind die globalen Hotkeys des Tools ausgesetzt, sonst käme eine schon belegte Kombination nie an. Der
   Hotkey kopiert den markierten Text, öffnet das Popup und führt die Aktion sofort aus.
+- **Doppeldruck** (z. B. Strg+X+X): im Hotkey-Feld dieselbe Kombination zweimal schnell drücken (600 ms). Gilt für
+  Aktions-Hotkeys und den zweiten Hotkey; das Zeitfenster beim Auslösen ist `doubleCopyMs`.
+- **Zweiter Hotkey** ist optional: Entf im Feld, speichern, dann ist keiner registriert.
 - **Testen:** Beispieltext (und bei „Eingabefeld im Popup“ die Eingabe) eintragen; die Aktion läuft mit den noch nicht
   gespeicherten Werten, auch mit dem geänderten System-Prompt aus „Allgemein“.
 - **Allgemein:** Zeitfenster für Strg+C+C, zweiter Hotkey, Standardmodell, Timeout, Wartezeit beim Einfügen,
@@ -162,9 +165,10 @@ beim npm-Paket cross-spawn doppelt mit `^` maskiert (`ClaudeExecutable.BuildComm
 
 - **Strg+C+C:** Ein Low-Level-Tastaturhook (`Hotkeys/KeyboardHook.cs`) erkennt zweimal Strg+C innerhalb von
   `doubleCopyMs` (Standard 400 ms). Tasten werden nie geschluckt, Kopieren funktioniert weiter normal. Gedrückt
-  gehaltenes C (Autorepeat), Strg+Alt+C und von Programmen erzeugte Tastendrücke zählen nicht; jede andere Taste
-  dazwischen setzt die Erkennung zurück. Danach wartet das Tool bis zu 600 ms, bis das Programm fertig kopiert hat.
-- **Zweiter Hotkey** (Standard Strg+Alt+Leertaste, `RegisterHotKey`): Das Tool wartet, bis die Hotkey-Tasten
+  gehaltenes C (Autorepeat), weitere Modifier (Strg+Umschalt+C, Strg+Alt+C) und von Programmen erzeugte
+  Tastendrücke zählen nicht; jede andere Taste dazwischen setzt die Erkennung zurück. Danach wartet das Tool bis zu
+  600 ms, bis das Programm fertig kopiert hat.
+- **Zweiter Hotkey** (Standard Strg+Alt+Leertaste, optional, auch als Doppeldruck): Das Tool wartet, bis die Hotkey-Tasten
   losgelassen sind (sonst käme Strg+Alt+C an), sichert die Zwischenablage, sendet Strg+C per `SendInput`, liest den
   Text und stellt die Zwischenablage wieder her. Ändert sich die Zwischenablage nicht, war nichts markiert.
 - **Sichern und Wiederherstellen** (`Clipboard/ClipboardService.cs`): alle lesbaren Formate (Text, RTF, HTML,
@@ -192,6 +196,23 @@ Scheitert ein Schritt, kommt das Popup mit einer Meldung zurück; das Ergebnis b
 sich das Fenster nicht aktivieren, bleibt das Ergebnis zusätzlich in der Zwischenablage, um es selbst einzufügen.
 
 Fügt ein langsames Programm noch den alten Inhalt ein, `pasteDelayMs` in `actions.json` erhöhen (100–5000).
+
+## Doppeldruck-Hotkeys
+
+In `actions.json` steht die Taste zweimal: `"hotkey": "ctrl+x+x"`, `"secondHotkey": "ctrl+alt+q+q"`.
+`RegisterHotKey` kennt keinen Doppeldruck; diese Kombinationen erkennt deshalb derselbe Low-Level-Hook wie Strg+C+C
+(`Hotkeys/DoublePressDetector.cs`). Die Modifier müssen genau stimmen, gehaltene Tasten zählen nicht doppelt.
+
+- **Der erste Druck kommt beim Programm an.** Der Hook schluckt keine Tasten, denn beim ersten Druck weiß er noch
+  nicht, ob ein zweiter folgt. Deshalb Kombinationen wählen, deren einfacher Druck nichts Schlimmes tut.
+- **Strg+X+X** schneidet die Markierung beim ersten Druck aus, das Tool nimmt den Text dann aus der Zwischenablage
+  (wie bei Strg+C+C). „Ersetzen“ setzt das Ergebnis an der Stelle ein. Schließt man das Popup ohne Ersetzen, fehlt
+  der Text im Dokument; Strg+Z oder Strg+V holt ihn zurück.
+- Bei allen anderen Tasten kopiert das Tool nach dem zweiten Druck selbst (Strg+C) und stellt die Zwischenablage
+  danach wieder her, wie beim zweiten Hotkey.
+- Vergeben sind: Strg+C+C (eingebaut) und damit auch Strg+C allein, das sonst das normale Kopieren abfangen würde.
+  Einfacher und doppelter Druck derselben Tasten (Strg+X und Strg+X+X) schließen sich gegenseitig aus.
+- Doppeldrucke können nicht „von einem anderen Programm belegt“ sein, weil nur der Hook des Tools sie sieht.
 
 ## Entscheidungen und Abweichungen vom Plan
 

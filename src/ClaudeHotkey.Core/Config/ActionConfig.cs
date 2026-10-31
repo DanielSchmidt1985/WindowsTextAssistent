@@ -8,6 +8,7 @@ namespace ClaudeHotkey.Core.Config;
 public sealed class AppSettings
 {
     public int DoubleCopyMs { get; set; } = 400;
+    /// <summary>Empty: no second hotkey, only Ctrl+C+C and the actions' own hotkeys.</summary>
     public string SecondHotkey { get; set; } = "ctrl+alt+space";
     public string Model { get; set; } = "haiku";
     public int TimeoutSeconds { get; set; } = 60;
@@ -109,13 +110,23 @@ public sealed class ActionConfig
             Setting("pasteDelayMs", "Muss zwischen 100 und 5000 liegen.");
         if (string.IsNullOrWhiteSpace(Settings.Model))
             Setting("model", "Darf nicht leer sein.");
-        if (!HotkeyGesture.TryParse(Settings.SecondHotkey, out var secondHotkey))
-            Setting("secondHotkey", $"„{Settings.SecondHotkey}“ ist keine gültige Tastenkombination.");
+        // Taken key combinations and who has them. Ctrl+C+C is built in; a single Ctrl+C would
+        // also break normal copying, so anything on Ctrl+C counts as taken.
+        var hotkeys = new List<(HotkeyGesture Gesture, string Owner)> { (HotkeyGesture.DoubleCopy, "Strg+C+C") };
+        string? TakenBy(HotkeyGesture gesture) => hotkeys.FirstOrDefault(h => h.Gesture.SharesKeysWith(gesture)).Owner;
+
+        // Empty means: no second hotkey.
+        if (!string.IsNullOrWhiteSpace(Settings.SecondHotkey))
+        {
+            if (!HotkeyGesture.TryParse(Settings.SecondHotkey, out var secondHotkey))
+                Setting("secondHotkey", $"„{Settings.SecondHotkey}“ ist keine gültige Tastenkombination.");
+            else if (TakenBy(secondHotkey) is { } owner)
+                Setting("secondHotkey", $"{secondHotkey} ist schon für {owner} vergeben.");
+            else
+                hotkeys.Add((secondHotkey, "den zweiten Hotkey"));
+        }
 
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var hotkeys = new Dictionary<HotkeyGesture, string>();
-        if (secondHotkey is not null)
-            hotkeys[secondHotkey] = "den zweiten Hotkey";
 
         for (var i = 0; i < Actions.Count; i++)
         {
@@ -139,10 +150,10 @@ public sealed class ActionConfig
             {
                 if (!HotkeyGesture.TryParse(action.Hotkey, out var gesture))
                     Field("hotkey", $"hotkey „{action.Hotkey}“ ist keine gültige Tastenkombination.");
-                else if (hotkeys.TryGetValue(gesture, out var owner))
+                else if (TakenBy(gesture) is { } owner)
                     Field("hotkey", $"hotkey {gesture} ist schon für {owner} vergeben.");
                 else
-                    hotkeys[gesture] = name;
+                    hotkeys.Add((gesture, name));
             }
         }
         return errors;

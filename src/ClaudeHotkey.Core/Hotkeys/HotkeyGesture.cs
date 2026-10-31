@@ -13,9 +13,16 @@ public enum HotkeyModifiers : uint
     Win = MOD_WIN,
 }
 
-/// <summary>A key combination as written in actions.json, e.g. "ctrl+alt+space".</summary>
-public sealed record HotkeyGesture(HotkeyModifiers Modifiers, int VirtualKey)
+/// <summary>
+/// A key combination as written in actions.json: "ctrl+alt+space", or with the key twice for a
+/// double press, "ctrl+x+x" (modifiers held, key pressed twice in quick succession). Single
+/// presses go through RegisterHotKey, double presses through the keyboard hook.
+/// </summary>
+public sealed record HotkeyGesture(HotkeyModifiers Modifiers, int VirtualKey, bool IsDoublePress = false)
 {
+    /// <summary>The built-in trigger, always active and reserved.</summary>
+    public static readonly HotkeyGesture DoubleCopy = new(HotkeyModifiers.Ctrl, 'C', IsDoublePress: true);
+
     private static readonly Dictionary<string, HotkeyModifiers> ModifierNames = new(StringComparer.OrdinalIgnoreCase)
     {
         ["ctrl"] = HotkeyModifiers.Ctrl, ["control"] = HotkeyModifiers.Ctrl, ["strg"] = HotkeyModifiers.Ctrl,
@@ -37,6 +44,9 @@ public sealed record HotkeyGesture(HotkeyModifiers Modifiers, int VirtualKey)
         ["pause"] = 0x13,
     };
 
+    /// <summary>Same modifiers and key, single or double: both cannot be used at the same time.</summary>
+    public bool SharesKeysWith(HotkeyGesture other) => Modifiers == other.Modifiers && VirtualKey == other.VirtualKey;
+
     public static bool TryParse(string? text, [NotNullWhen(true)] out HotkeyGesture? gesture)
     {
         gesture = null;
@@ -44,23 +54,29 @@ public sealed record HotkeyGesture(HotkeyModifiers Modifiers, int VirtualKey)
             return false;
 
         var modifiers = HotkeyModifiers.None;
-        int? key = null;
+        var keys = new List<int>();
         foreach (var part in text.Split('+', StringSplitOptions.TrimEntries))
         {
             if (ModifierNames.TryGetValue(part, out var modifier))
             {
+                if (keys.Count > 0)
+                    return false; // modifiers come first
                 modifiers |= modifier;
                 continue;
             }
-            if (key is not null || ParseKey(part) is not { } vk)
+            if (ParseKey(part) is not { } vk)
                 return false;
-            key = vk;
+            keys.Add(vk);
         }
 
-        // A hotkey without Ctrl, Alt or Win would fire while typing.
-        if (key is null || (modifiers & (HotkeyModifiers.Ctrl | HotkeyModifiers.Alt | HotkeyModifiers.Win)) == 0)
+        // One key, or the same key twice for a double press.
+        var isDouble = keys.Count == 2 && keys[0] == keys[1];
+        if (keys.Count is 0 or > 2 || (keys.Count == 2 && !isDouble))
             return false;
-        gesture = new HotkeyGesture(modifiers, key.Value);
+        // Without Ctrl, Alt or Win the hotkey would fire while typing.
+        if ((modifiers & (HotkeyModifiers.Ctrl | HotkeyModifiers.Alt | HotkeyModifiers.Win)) == 0)
+            return false;
+        gesture = new HotkeyGesture(modifiers, keys[0], isDouble);
         return true;
     }
 
@@ -83,6 +99,8 @@ public sealed record HotkeyGesture(HotkeyModifiers Modifiers, int VirtualKey)
         if (Modifiers.HasFlag(HotkeyModifiers.Shift)) parts.Add("shift");
         if (Modifiers.HasFlag(HotkeyModifiers.Win)) parts.Add("win");
         parts.Add(KeyName(VirtualKey));
+        if (IsDoublePress)
+            parts.Add(KeyName(VirtualKey));
         return string.Join('+', parts);
     }
 

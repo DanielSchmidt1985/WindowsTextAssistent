@@ -167,6 +167,38 @@ public class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Empty_second_hotkey_is_saved()
+    {
+        var (vm, store) = Create();
+        vm.SecondHotkey = "";
+
+        Assert.True(vm.Save());
+        Assert.Equal("", store.Current.Settings.SecondHotkey);
+        Assert.Null(vm.GeneralErrors["secondHotkey"]);
+    }
+
+    [Fact]
+    public void Double_press_hotkey_is_saved()
+    {
+        var (vm, store) = Create();
+        vm.Selected!.Hotkey = "ctrl+x+x";
+
+        Assert.True(vm.Save());
+        Assert.Equal("ctrl+x+x", store.Current.Actions[0].Hotkey);
+    }
+
+    [Theory]
+    [InlineData(null, 0, "ctrl+x", 100, "ctrl+x")]           // first press
+    [InlineData("ctrl+x", 100, "ctrl+x", 400, "ctrl+x+x")]   // second press in time
+    [InlineData("ctrl+x", 100, "ctrl+x", 900, "ctrl+x")]     // too slow
+    [InlineData("ctrl+x", 100, "ctrl+y", 200, "ctrl+y")]     // other key
+    [InlineData("ctrl+alt+f2", 0, "ctrl+alt+f2", 100, "ctrl+alt+f2+f2")]
+    public void Hotkey_box_turns_quick_repeat_into_double_press(string? previous, long previousMs, string combo, long nowMs, string expected)
+    {
+        Assert.Equal(expected, ClaudeHotkey.Views.HotkeyCaptureRules.Combine(previous, previousMs, combo, nowMs));
+    }
+
+    [Fact]
     public async Task Test_uses_unsaved_prompt_and_system_prompt()
     {
         var (vm, _) = Create();

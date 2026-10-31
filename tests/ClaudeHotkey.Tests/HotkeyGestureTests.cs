@@ -21,7 +21,10 @@ public class HotkeyGestureTests
     [InlineData("ctrl+alt")]          // no key
     [InlineData("shift+a")]           // would fire while typing
     [InlineData("a")]
-    [InlineData("ctrl+a+b")]          // two keys
+    [InlineData("ctrl+a+b")]          // two different keys
+    [InlineData("ctrl+x+x+x")]        // triple press
+    [InlineData("x+ctrl+x")]          // modifier after a key
+    [InlineData("shift+x+x")]         // double press still needs Ctrl, Alt or Win
     [InlineData("ctrl+unbekannt")]
     [InlineData("ctrl+f25")]
     public void Rejects_invalid_gestures(string text)
@@ -30,9 +33,37 @@ public class HotkeyGestureTests
     }
 
     [Theory]
+    [InlineData("ctrl+x+x", HotkeyModifiers.Ctrl, 'X')]
+    [InlineData("Strg+Alt+Leertaste+Leertaste", HotkeyModifiers.Ctrl | HotkeyModifiers.Alt, 0x20)]
+    [InlineData("alt+f2+f2", HotkeyModifiers.Alt, 0x71)]
+    public void Parses_double_press(string text, HotkeyModifiers modifiers, int virtualKey)
+    {
+        Assert.True(HotkeyGesture.TryParse(text, out var gesture));
+        Assert.Equal(new HotkeyGesture(modifiers, virtualKey, IsDoublePress: true), gesture);
+    }
+
+    [Fact]
+    public void Single_and_double_press_differ_but_share_keys()
+    {
+        HotkeyGesture.TryParse("ctrl+x", out var single);
+        HotkeyGesture.TryParse("ctrl+x+x", out var twice);
+
+        Assert.NotEqual(single, twice);
+        Assert.True(single!.SharesKeysWith(twice!));
+    }
+
+    [Fact]
+    public void Built_in_double_copy_is_ctrl_c_c()
+    {
+        Assert.Equal("ctrl+c+c", HotkeyGesture.DoubleCopy.ToString());
+    }
+
+    [Theory]
     [InlineData("ctrl+alt+space")]
     [InlineData("ctrl+shift+t")]
     [InlineData("win+f12")]
+    [InlineData("ctrl+x+x")]
+    [InlineData("ctrl+alt+f2+f2")]
     public void Round_trips_through_string(string text)
     {
         Assert.True(HotkeyGesture.TryParse(text, out var gesture));
