@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
@@ -22,6 +23,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClaudeHotkey.Core\ClaudeHotkey.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
   </ItemGroup>
 
 </Project>

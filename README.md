@@ -4,7 +4,8 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Phase 1 (Gerüst und CLI-Kern)**. Hotkey, Popup und Tray folgen in den nächsten Phasen.
+Stand: **Phase 2 (Hotkey und Textübernahme)**. Popup, Ersetzen und Tray folgen in den nächsten Phasen.
+Bis dahin zeigt die App ein vorläufiges Testfenster, das jede Textübernahme auflistet; Schließen beendet das Tool.
 
 ## Voraussetzungen
 
@@ -69,7 +70,28 @@ Ein in den Einstellungen gesetzter Pfad gewinnt. Sonst wird im `PATH` zuerst `cl
 gesucht. Ein `.cmd` (npm-Installation) wird über `cmd.exe /d /s /c` gestartet; die Argumente werden dafür wie
 beim npm-Paket cross-spawn doppelt mit `^` maskiert (`ClaudeExecutable.BuildCommand`).
 
+## Textübernahme
+
+- **Strg+C+C:** Ein Low-Level-Tastaturhook (`Hotkeys/KeyboardHook.cs`) erkennt zweimal Strg+C innerhalb von
+  `doubleCopyMs` (Standard 400 ms). Tasten werden nie geschluckt, Kopieren funktioniert weiter normal. Gedrückt
+  gehaltenes C (Autorepeat), Strg+Alt+C und von Programmen erzeugte Tastendrücke zählen nicht; jede andere Taste
+  dazwischen setzt die Erkennung zurück. Danach wartet das Tool bis zu 600 ms, bis das Programm fertig kopiert hat.
+- **Zweiter Hotkey** (Standard Strg+Alt+Leertaste, `RegisterHotKey`): Das Tool wartet, bis die Hotkey-Tasten
+  losgelassen sind (sonst käme Strg+Alt+C an), sichert die Zwischenablage, sendet Strg+C per `SendInput`, liest den
+  Text und stellt die Zwischenablage wieder her. Ändert sich die Zwischenablage nicht, war nichts markiert.
+- **Sichern und Wiederherstellen** (`Clipboard/ClipboardService.cs`): alle lesbaren Formate (Text, RTF, HTML,
+  Bilder, Dateien). Formate, die sich nicht lesen lassen, werden übersprungen. Zugriffe werden bis zu zehnmal
+  wiederholt, weil andere Programme die Zwischenablage kurz offen halten.
+- **Zwischenablageverlauf von Windows:** Der Dienst `cbdhsvc` liest nach jedem Schreiben die Daten per COM aus
+  unserem Prozess, während er die Zwischenablage offen hält. Gewartet wird deshalb mit `Thread.Join` (verarbeitet
+  COM-Nachrichten) statt `Thread.Sleep`; sonst warten beide Seiten aufeinander und Zugriffe scheitern nach Sekunden.
+
 ## Entscheidungen und Abweichungen vom Plan
+
+- **Zwischenablage bei Strg+C+C:** Hier bleibt der markierte Text in der Zwischenablage, wie bei DeepL. Der Nutzer
+  hat selbst kopiert, und der Inhalt davor lässt sich nicht zuverlässig sichern: Das erste Strg+C hat ihn schon
+  überschrieben, bevor das Tool weiß, dass ein zweites folgt. Wiederhergestellt wird beim zweiten Hotkey und
+  (Phase 4) nach dem Ersetzen.
 
 - **Solution-Format:** Das installierte SDK 10 erzeugt standardmäßig `.slnx`; angelegt ist bewusst eine klassische
   `ClaudeHotkey.sln`, Zielplattform aller Projekte `net8.0-windows`.
@@ -82,6 +104,11 @@ beim npm-Paket cross-spawn doppelt mit `^` maskiert (`ClaudeExecutable.BuildComm
 - **Eigene Hotkeys pro Aktion** werden in Phase 5 (Einstellungsdialog) umgesetzt, nicht erst als spätere Erweiterung.
 
 ## Bekannte Einschränkungen
+
+- Die Clipboard-Tests benutzen die echte Zwischenablage. Sie sichern den Inhalt vorher und stellen ihn danach wieder
+  her; während `dotnet test` sollte man trotzdem nicht kopieren.
+- Fenster von Programmen mit Administratorrechten erreicht der zweite Hotkey nicht (kein `SendInput` dorthin),
+  solange das Tool selbst ohne Adminrechte läuft. Strg+C+C funktioniert dort, weil der Nutzer selbst kopiert.
 
 - Jeder Aufruf startet einen eigenen Claude-Code-Prozess; einige Sekunden bis zur Antwort sind normal.
 - Bei einem Enterprise-Konto (`subscriptionType: enterprise`) laufen die Aufrufe über den Sitz der Organisation.
