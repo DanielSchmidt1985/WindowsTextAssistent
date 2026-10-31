@@ -85,7 +85,7 @@ public sealed class ActionConfig
 
         config.Settings ??= new AppSettings();
         config.Actions ??= [];
-        var errors = config.Validate();
+        var errors = config.ValidateDetailed();
         if (errors.Count > 0)
             throw new ActionConfigException(errors);
         return config;
@@ -93,48 +93,54 @@ public sealed class ActionConfig
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
-    public IReadOnlyList<string> Validate()
+    public IReadOnlyList<string> Validate() => ValidateDetailed().Select(e => e.Message).ToList();
+
+    /// <summary>Like <see cref="Validate"/>, but each error names its action and field for the settings dialog.</summary>
+    public IReadOnlyList<ConfigError> ValidateDetailed()
     {
-        var errors = new List<string>();
+        var errors = new List<ConfigError>();
+        void Setting(string field, string text) => errors.Add(new ConfigError(null, field, text, $"{field}: {text}"));
 
         if (Settings.DoubleCopyMs is < 100 or > 2000)
-            errors.Add("doubleCopyMs muss zwischen 100 und 2000 liegen.");
+            Setting("doubleCopyMs", "Muss zwischen 100 und 2000 liegen.");
         if (Settings.TimeoutSeconds is < 5 or > 600)
-            errors.Add("timeoutSeconds muss zwischen 5 und 600 liegen.");
+            Setting("timeoutSeconds", "Muss zwischen 5 und 600 liegen.");
         if (Settings.PasteDelayMs is < 100 or > 5000)
-            errors.Add("pasteDelayMs muss zwischen 100 und 5000 liegen.");
+            Setting("pasteDelayMs", "Muss zwischen 100 und 5000 liegen.");
         if (string.IsNullOrWhiteSpace(Settings.Model))
-            errors.Add("model darf nicht leer sein.");
+            Setting("model", "Darf nicht leer sein.");
         if (!HotkeyGesture.TryParse(Settings.SecondHotkey, out var secondHotkey))
-            errors.Add($"secondHotkey „{Settings.SecondHotkey}“ ist keine gültige Tastenkombination.");
+            Setting("secondHotkey", $"„{Settings.SecondHotkey}“ ist keine gültige Tastenkombination.");
 
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var hotkeys = new Dictionary<HotkeyGesture, string>();
         if (secondHotkey is not null)
-            hotkeys[secondHotkey] = "secondHotkey";
+            hotkeys[secondHotkey] = "den zweiten Hotkey";
 
         for (var i = 0; i < Actions.Count; i++)
         {
             var action = Actions[i];
             var name = string.IsNullOrWhiteSpace(action.Label) ? $"Aktion {i + 1}" : $"„{action.Label}“";
+            var index = i;
+            void Field(string field, string text) => errors.Add(new ConfigError(index, field, text, $"{name}: {text}"));
 
             if (string.IsNullOrWhiteSpace(action.Id))
-                errors.Add($"{name}: id fehlt.");
+                Field("id", "id fehlt.");
             else if (!ids.Add(action.Id))
-                errors.Add($"{name}: id „{action.Id}“ ist doppelt vergeben.");
+                Field("id", $"id „{action.Id}“ ist doppelt vergeben.");
             if (string.IsNullOrWhiteSpace(action.Label))
-                errors.Add($"{name}: label fehlt.");
+                Field("label", "label fehlt.");
             if (string.IsNullOrWhiteSpace(action.Prompt))
-                errors.Add($"{name}: prompt ist leer.");
+                Field("prompt", "prompt ist leer.");
             if (action.AskInput && !action.Prompt.Contains("{input}", StringComparison.Ordinal))
-                errors.Add($"{name}: askInput ist an, aber der Prompt enthält kein {{input}}.");
+                Field("askInput", "askInput ist an, aber der Prompt enthält kein {input}.");
 
             if (!string.IsNullOrWhiteSpace(action.Hotkey))
             {
                 if (!HotkeyGesture.TryParse(action.Hotkey, out var gesture))
-                    errors.Add($"{name}: hotkey „{action.Hotkey}“ ist keine gültige Tastenkombination.");
+                    Field("hotkey", $"hotkey „{action.Hotkey}“ ist keine gültige Tastenkombination.");
                 else if (hotkeys.TryGetValue(gesture, out var owner))
-                    errors.Add($"{name}: hotkey {gesture} ist schon für {owner} vergeben.");
+                    Field("hotkey", $"hotkey {gesture} ist schon für {owner} vergeben.");
                 else
                     hotkeys[gesture] = name;
             }
@@ -143,10 +149,31 @@ public sealed class ActionConfig
     }
 }
 
-public sealed class ActionConfigException(IReadOnlyList<string> errors)
-    : Exception(string.Join(Environment.NewLine, errors))
+/// <param name="ActionIndex">Index in <see cref="ActionConfig.Actions"/>; null for a general setting.</param>
+/// <param name="Field">JSON name of the field, e.g. "prompt" or "doubleCopyMs".</param>
+/// <param name="FieldMessage">Short text to show next to the field.</param>
+/// <param name="Message">Full text including which action it is about.</param>
+public sealed record ConfigError(int? ActionIndex, string Field, string FieldMessage, string Message);
+
+public sealed class ActionConfigException : Exception
 {
-    public IReadOnlyList<string> Errors { get; } = errors;
+    public ActionConfigException(IReadOnlyList<string> errors)
+        : base(string.Join(Environment.NewLine, errors))
+    {
+        Errors = errors;
+        Details = errors.Select(e => new ConfigError(null, "", e, e)).ToList();
+    }
+
+    public ActionConfigException(IReadOnlyList<ConfigError> errors)
+        : base(string.Join(Environment.NewLine, errors.Select(e => e.Message)))
+    {
+        Errors = errors.Select(e => e.Message).ToList();
+        Details = errors;
+    }
+
+    public IReadOnlyList<string> Errors { get; }
+
+    public IReadOnlyList<ConfigError> Details { get; }
 }
 
 /// <summary>
@@ -222,7 +249,7 @@ public sealed class ActionConfigStore
     /// <summary>Validates and saves. Throws <see cref="ActionConfigException"/> without touching the file.</summary>
     public void Save(ActionConfig config)
     {
-        var errors = config.Validate();
+        var errors = config.ValidateDetailed();
         if (errors.Count > 0)
             throw new ActionConfigException(errors);
 

@@ -4,7 +4,7 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Phase 4 (Ersetzen und Kopieren)**. Einstellungsdialog (Phase 5) und Tray (Phase 6) folgen. Bis zum Tray-Icon zeigt die App ein vorläufiges Statusfenster; Schließen beendet das Tool.
+Stand: **Phase 5 (Einstellungsdialog)**. Tray, Autostart und Logdatei (Phase 6) folgen. Bis zum Tray-Icon zeigt die App ein vorläufiges Statusfenster; Schließen beendet das Tool.
 
 ## Bedienung
 
@@ -18,12 +18,35 @@ Text markieren, **Strg+C+C** oder **Strg+Alt+Leertaste** drücken. Das Popup öf
 - Bei Fehlern steht eine kurze Meldung im Popup, die Rohausgabe der CLI unter „Details“, dazu „Erneut versuchen“.
 - Ein neuer Auslöser ersetzt ein offenes Popup und bricht dessen Aufruf ab.
 
+## Einstellungsdialog
+
+Öffnen über das Zahnrad im Popup oder „Einstellungen …“ im Statusfenster (ab Phase 6 über das Tray-Menü).
+Der Dialog schreibt dieselbe `actions.json`, die sich auch von Hand bearbeiten lässt.
+
+- **Aktionen:** Liste links, per Drag-and-drop oder mit ↑/↓ sortierbar; die Reihenfolge ist die der Popup-Buttons.
+  Neu, Duplizieren (ohne Hotkey, der wäre doppelt) und Löschen. Rechts Name, Prompt, Modell (Auswahl oder freie
+  Eingabe, leer = Standard), eigener Hotkey, Ersetzen-Button, Eingabefeld und Aktiv.
+- **Kennung:** Bei neuen Aktionen folgt sie dem Namen („Höflicher“ → `hoeflicher`), nach dem ersten Speichern bleibt
+  sie fest. Bestehende Aktionen behalten ihre Kennung immer.
+- **Eigener Hotkey:** Feld anklicken und die Kombination drücken, Entf oder Rücktaste löscht. Solange das Feld den
+  Fokus hat, sind die globalen Hotkeys des Tools ausgesetzt, sonst käme eine schon belegte Kombination nie an. Der
+  Hotkey kopiert den markierten Text, öffnet das Popup und führt die Aktion sofort aus.
+- **Testen:** Beispieltext (und bei „Eingabefeld im Popup“ die Eingabe) eintragen; die Aktion läuft mit den noch nicht
+  gespeicherten Werten, auch mit dem geänderten System-Prompt aus „Allgemein“.
+- **Allgemein:** Zeitfenster für Strg+C+C, zweiter Hotkey, Standardmodell, Timeout, Wartezeit beim Einfügen,
+  Pfad zur CLI, System-Prompt, Autostart.
+- **Speichern** (oder Strg+S) prüft alles, schreibt atomar und wirkt sofort, auch für Hotkeys. Fehler stehen rot am
+  Feld, Aktionen mit Fehlern haben einen roten Punkt in der Liste, und die Datei bleibt dann unverändert.
+- **Schließen** mit ungespeicherten Änderungen fragt nach.
+
+Wird `actions.json` von Hand geändert, übernimmt das Tool die neue Fassung beim nächsten Auslösen, einschließlich der
+Hotkeys.
+
 ## Konfiguration
 
 `%APPDATA%\ClaudeHotkey\actions.json` entsteht beim ersten Start aus `src/ClaudeHotkey.Core/Config/actions.default.json`
-(eingebettet in die DLL). Die Datei wird vor jedem Popup neu gelesen, wenn sie sich geändert hat; Änderungen an
-Aktionen und Prompts gelten also ohne Neustart. `doubleCopyMs` gilt ab der nächsten Übernahme, `secondHotkey` erst
-nach einem Neustart (live ab Phase 5).
+(eingebettet in die DLL). Die Datei wird vor jedem Popup neu gelesen, wenn sie sich geändert hat; alle Änderungen
+gelten ohne Neustart.
 
 - Erlaubt sind Kommentare (`//`) und Kommas am Ende.
 - Geprüft wird: eindeutige `id`, nicht leerer `prompt`, `askInput` nur mit `{input}` im Prompt, gültige und nicht
@@ -40,7 +63,8 @@ Plan gibt es `HoverBrush`, `PressedBrush` und `SelectionBrush`.
 
 Zum Vergleichen mit dem Referenz-Screenshot öffnet `ClaudeHotkey.exe --demo <zustand>` das Popup mit Beispieltext,
 ohne Hook und ohne Claude-Aufruf. Zustände: `choose`, `input`, `running`, `result`, `error`, `nocapture`,
-`replacefail`.
+`replacefail`. Den Einstellungsdialog zeigen `settings`, `settings-general`, `settings-errors` und `settings-test`;
+sie arbeiten auf einer Kopie in `%TEMP%\ClaudeHotkey-demo`, nie auf der echten `actions.json`.
 
 ## Voraussetzungen
 
@@ -147,9 +171,15 @@ Fügt ein langsames Programm noch den alten Inhalt ein, `pasteDelayMs` in `actio
   Deshalb eine feste, einstellbare Wartezeit.
 - **Referenz-Screenshot:** `docs/neptun-reference.png` lag in Phase 3 nicht vor. Das Design nutzt die Startwerte aus
   dem Plan; der Abgleich (Design-Abnahme) ist offen.
-- **Control-Templates:** In Phase 3 gibt es eigene Templates für Button, TextBox, ScrollBar, ToolTip, ContextMenu,
-  MenuItem, Separator und ProgressBar. ComboBox, CheckBox, ListBox und TabControl folgen in Phase 5 mit dem
-  Einstellungsdialog, der sie als Erster verwendet.
+- **Control-Templates:** Alle Controls aus dem Plan haben eigene Templates (Button, TextBox, ComboBox, CheckBox als
+  Schalter, ListBox, ScrollBar, TabControl, ToolTip, ContextMenu), dazu ProgressBar, MenuItem und Separator.
+  Ausnahme: Die Rückfrage beim Schließen mit ungespeicherten Änderungen ist eine Windows-MessageBox und deshalb hell.
+- **Eigene Hotkeys pro Aktion** sind in Phase 5 umgesetzt, nicht erst als spätere Erweiterung.
+- **Autostart:** Der Schalter wird in Phase 5 nur gespeichert; den Registry-Eintrag setzt das Tool ab Phase 6.
+- **Speichern schließt nicht:** Der Dialog bleibt offen, damit sich Prompts nacheinander abstimmen lassen.
+- **Auslöser in eigenen Fenstern** (Popup, Einstellungen) werden ignoriert, damit Kopieren dort kein neues Popup öffnet.
+- **Modellauswahl:** Vorgeschlagen werden die Aliasse `haiku`, `sonnet`, `opus` und `fable` (laut `claude --help`);
+  freie Eingabe eines vollen Modellnamens ist möglich.
 - **Tasten 1–9** im Popup starten Aktionen; das steht nicht im Plan, spart aber den Griff zur Maus.
 - **Popup-Fokus:** Weil das Popup aus einem Hook heraus erscheint, erlaubt Windows ihm den Vordergrund nicht direkt.
   `ForegroundWindow.Activate` hängt sich dafür kurz an die Eingabewarteschlange des aktiven Fensters

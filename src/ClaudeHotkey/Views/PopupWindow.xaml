@@ -20,6 +20,8 @@
             <DockPanel x:Name="Header" Background="Transparent" MouseLeftButtonDown="Header_MouseLeftButtonDown">
                 <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="✕" FontSize="11"
                         ToolTip="Schließen (Esc)" Click="Close_Click" IsTabStop="False" />
+                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="⚙" FontSize="14"
+                        ToolTip="Einstellungen" Click="Settings_Click" IsTabStop="False" />
                 <TextBlock Style="{StaticResource Heading}" Text="Claude" VerticalAlignment="Center" />
                 <TextBlock Style="{StaticResource Muted}" Text="{Binding SourceInfo}" Margin="8,0,0,0" VerticalAlignment="Center" />
             </DockPanel>

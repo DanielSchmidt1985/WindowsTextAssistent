@@ -37,6 +37,13 @@ public static class ForegroundWindow
         }
     }
 
+    /// <summary>True for windows of this process (popup, settings), where triggers are ignored.</summary>
+    public static bool BelongsToThisProcess(IntPtr hwnd)
+    {
+        GetWindowThreadProcessId(hwnd, out var processId);
+        return processId == (uint)Environment.ProcessId;
+    }
+
     /// <summary>False when the window has been closed in the meantime.</summary>
     public static bool Exists(IntPtr hwnd) => hwnd != IntPtr.Zero && IsWindow(hwnd);
 

@@ -76,7 +76,7 @@ public class ActionConfigTests : IDisposable
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "askInput": true }""", "{input}")]
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "shift+x" }""", "keine gültige")]
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+1" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "Strg+Alt+1" }""", "schon für „A“")]
-    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+space" }""", "schon für secondHotkey")]
+    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+space" }""", "schon für den zweiten Hotkey")]
     public void Invalid_actions_are_rejected(string actions, string expected)
     {
         var ex = Assert.Throws<ActionConfigException>(() => ActionConfig.Parse(Json(actions)));

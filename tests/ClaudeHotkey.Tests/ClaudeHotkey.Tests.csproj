@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClaudeHotkey.Core\ClaudeHotkey.Core.csproj" />
+    <ProjectReference Include="..\..\src\ClaudeHotkey\ClaudeHotkey.csproj" />
   </ItemGroup>
 
   <ItemGroup>

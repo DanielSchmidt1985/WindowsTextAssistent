@@ -50,7 +50,7 @@ public class ThemeTests
         Left = -20000,
         Top = -20000,
         Width = 400,
-        Height = 200,
+        Height = 700,
         ShowActivated = false,
         ShowInTaskbar = false,
         WindowStyle = WindowStyle.None,
@@ -117,6 +117,11 @@ public class ThemeTests
                     new TextBox { Text = "Nur lesen", Style = (Style)theme["ReadOnlyText"] },
                     new ScrollViewer { Height = 40, Content = new TextBlock { Text = string.Join("\n", Enumerable.Range(1, 20)) } },
                     new TextBlock { Text = "Überschrift", Style = (Style)theme["Heading"] },
+                    new CheckBox { Content = "Schalter", IsChecked = true },
+                    new ComboBox { IsEditable = true, ItemsSource = new[] { "haiku", "sonnet" }, Text = "haiku" },
+                    new ComboBox { ItemsSource = new[] { "a", "b" }, SelectedIndex = 0 },
+                    new ListBox { ItemsSource = new[] { "Eins", "Zwei" }, SelectedIndex = 0, Height = 60 },
+                    new TabControl { Height = 60, Items = { new TabItem { Header = "A", Content = "1" }, new TabItem { Header = "B", Content = "2" } } },
                 },
             };
             var window = OffScreenWindow(theme, panel);

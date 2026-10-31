@@ -68,4 +68,10 @@ public partial class PopupWindow : Window
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.RequestSettings();
+        Close();
+    }
 }

@@ -12,6 +12,10 @@ public partial class CaptureLogWindow : Window
 
     public CaptureLogWindow() => InitializeComponent();
 
+    public event EventHandler? SettingsRequested;
+
+    private void Settings_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+
     public void SetPreflight(string text) => PreflightText.Text = text;
 
     public void SetHotkeyStatus(string text) => HotkeyText.Text = text;

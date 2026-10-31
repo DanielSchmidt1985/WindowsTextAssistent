@@ -199,6 +199,18 @@ public sealed class PopupViewModel : ObservableObject
         return true;
     }
 
+    /// <summary>Starts the action with this id right away (own hotkey of an action).</summary>
+    public void StartAction(string id)
+    {
+        if (Actions.FirstOrDefault(a => a.Definition.Id == id) is { } item && CanRunActions)
+            _ = StartAsync(item);
+    }
+
+    /// <summary>The gear in the header asks for the settings dialog.</summary>
+    public event EventHandler? SettingsRequested;
+
+    public void RequestSettings() => SettingsRequested?.Invoke(this, EventArgs.Empty);
+
     /// <summary>Stops a running call; the CLI process tree is killed.</summary>
     public void Cancel() => _running?.Cancel();
 
