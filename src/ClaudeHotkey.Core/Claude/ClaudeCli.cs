@@ -46,8 +46,14 @@ public sealed record PreflightResult(
 /// </summary>
 public sealed class ClaudeCli
 {
-    /// <summary>Removed from the child environment; if set, Claude Code would bill the API instead of the subscription.</summary>
-    public static readonly IReadOnlyList<string> RemovedEnvironmentVariables = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"];
+    /// <summary>
+    /// Removed from the child environment. API key and token would make Claude Code bill the API
+    /// instead of the subscription. The rest is inherited when this tool is started from inside a
+    /// Claude Code session: CLAUDE_CODE_SIMPLE switches on --bare (never reads the subscription
+    /// login), ANTHROPIC_BASE_URL points at the parent session's proxy.
+    /// </summary>
+    public static readonly IReadOnlyList<string> RemovedEnvironmentVariables =
+        ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDECODE", "CLAUDE_CODE_*", "CLAUDE_AGENT_SDK_*"];
 
     private static readonly TimeSpan PreflightTimeout = TimeSpan.FromSeconds(60);
 

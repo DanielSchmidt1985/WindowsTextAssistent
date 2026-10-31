@@ -80,6 +80,25 @@ public class ClaudeCliTests
     }
 
     [Fact]
+    public void Inherited_claude_code_session_variables_are_removed()
+    {
+        var environment = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CLAUDE_CODE_SIMPLE"] = "1",
+            ["CLAUDE_CODE_ENTRYPOINT"] = "claude-desktop",
+            ["CLAUDECODE"] = "1",
+            ["ANTHROPIC_BASE_URL"] = "http://localhost:1234",
+            ["CLAUDE_AGENT_SDK_VERSION"] = "1.0",
+            ["PATH"] = @"C:\Windows",
+            ["CLAUDE_CONFIG_DIR"] = @"C:\custom",
+        };
+
+        ProcessRunner.RemoveEnvironmentVariables(environment, ClaudeCli.RemovedEnvironmentVariables);
+
+        Assert.Equal(["PATH", "CLAUDE_CONFIG_DIR"], environment.Keys.Order().Reverse());
+    }
+
+    [Fact]
     public async Task Successful_answer_is_returned_trimmed_and_unwrapped()
     {
         var (cli, _) = Create((_, _) => Ok(ResultJson("  <text>Hallo Welt!</text>\n")));

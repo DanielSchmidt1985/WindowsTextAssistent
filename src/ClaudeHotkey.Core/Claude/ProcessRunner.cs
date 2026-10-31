@@ -7,6 +7,7 @@ namespace ClaudeHotkey.Core.Claude;
 /// <summary>
 /// Everything needed to start one child process. <paramref name="RawArguments"/>, when set, is
 /// used verbatim instead of <paramref name="Arguments"/> (only for the cmd.exe route).
+/// <paramref name="RemovedEnvironmentVariables"/> may end in <c>*</c> to remove a whole prefix.
 /// </summary>
 public sealed record ProcessRequest(
     string FileName,
@@ -54,8 +55,7 @@ public sealed class ProcessRunner : IProcessRunner
         else
             foreach (var argument in request.Arguments)
                 startInfo.ArgumentList.Add(argument);
-        foreach (var name in request.RemovedEnvironmentVariables)
-            startInfo.Environment.Remove(name);
+        RemoveEnvironmentVariables(startInfo.Environment, request.RemovedEnvironmentVariables);
 
         using var process = new Process { StartInfo = startInfo };
         try
@@ -93,5 +93,21 @@ public sealed class ProcessRunner : IProcessRunner
 
         cancellationToken.ThrowIfCancellationRequested();
         return new ProcessResult(process.ExitCode, stdout, stderr);
+    }
+
+    /// <summary>Removes the given names; a trailing <c>*</c> removes every variable with that prefix.</summary>
+    internal static void RemoveEnvironmentVariables(IDictionary<string, string?> environment, IReadOnlyList<string> names)
+    {
+        foreach (var name in names)
+        {
+            if (!name.EndsWith('*'))
+            {
+                environment.Remove(name);
+                continue;
+            }
+            var prefix = name[..^1];
+            foreach (var key in environment.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+                environment.Remove(key);
+        }
     }
 }
