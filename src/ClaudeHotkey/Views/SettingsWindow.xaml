@@ -7,7 +7,7 @@
         Width="880" Height="680" MinWidth="720" MinHeight="520" WindowStartupLocation="CenterScreen"
         Background="{DynamicResource BgBrush}" Foreground="{DynamicResource TextBrush}"
         FontFamily="{StaticResource UiFont}" FontSize="{StaticResource FontSize}"
-        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+        UseLayoutRounding="True">
     <Window.Resources>
         <Style x:Key="Multiline" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="AcceptsReturn" Value="True" />
@@ -17,7 +17,7 @@
         </Style>
     </Window.Resources>
 
-    <DockPanel Margin="16,8,16,16">
+    <DockPanel Margin="16,8,16,16" LayoutTransform="{DynamicResource UiScale}">
         <!-- Bottom bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -221,7 +221,30 @@
                     <TextBlock Style="{StaticResource FieldLabel}" Text="System-Prompt (gilt für alle Aktionen)" Margin="0,14,0,4" />
                     <TextBox Style="{StaticResource Multiline}" Height="90" Text="{Binding SystemPrompt, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <CheckBox Content="Mit Windows starten" IsChecked="{Binding Autostart}" Margin="0,16,0,0" />
+                    <TextBlock Style="{StaticResource Heading}" Text="Darstellung" Margin="0,18,0,0" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Skalierung von Schrift und Bedienelementen (%)" />
+                            <TextBox Text="{Binding Scale, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="75–200. Schneller: Strg+Mausrad oder Strg+Plus/Minus in Popup und Einstellungen, Strg+0 = 100 %." />
+                            <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[scale]}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Breite des Popups (px)" />
+                            <TextBox Text="{Binding PopupWidth, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="320–1600. Oder im Popup am rechten Rand ziehen. Die Höhe wächst mit dem Inhalt." />
+                            <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[popupWidth]}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <CheckBox Content="Mit Windows starten" IsChecked="{Binding Autostart}" Margin="0,18,0,0" />
                     <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="40,4,0,0" TextWrapping="Wrap"
                                Text="Beim Speichern wird dieses Programm unter HKCU\…\Run eingetragen bzw. wieder entfernt. Am besten aus der veröffentlichten .exe einschalten, nicht aus einem Test-Build." />
                   </StackPanel>

@@ -20,6 +20,8 @@ public partial class App : Application
     private readonly ClipboardService _clipboard = new();
     private readonly ActionConfigStore _config = new(ActionConfigStore.DefaultDirectory, DefaultConfig.Json);
     private readonly AppLog _log = new(Path.Combine(ActionConfigStore.DefaultDirectory, AppLog.FileName));
+    private UiStateStore _ui = new(ActionConfigStore.DefaultDirectory);
+    private SettingsViewModel? _settingsViewModel;
     private SingleInstance? _instance;
     private TrayIcon? _tray;
     private KeyboardHook? _hook;
@@ -46,6 +48,14 @@ public partial class App : Application
         if (e.Args is ["--demo", var demoState, ..])
         {
             ShutdownMode = ShutdownMode.OnMainWindowClose;
+            // Own ui.json in %TEMP%, so trying Ctrl+wheel in a demo leaves the real one alone.
+            var demoUi = Path.Combine(Path.GetTempPath(), "ClaudeHotkey-demo-ui");
+            if (Directory.Exists(demoUi))
+                Directory.Delete(demoUi, recursive: true);
+            _ui = new UiStateStore(demoUi);
+            if (e.Args is [_, _, var scaleArg, ..] && int.TryParse(scaleArg, out var demoScale))
+                _ui.Update(s => s.Scale = demoScale);
+            UiScale.Apply(_ui.Current.Scale);
             ShowDemo(demoState);
             return;
         }
@@ -62,6 +72,7 @@ public partial class App : Application
             return;
         }
         _log.Write("start");
+        UiScale.Apply(_ui.Load().Scale);
 
         _tray = new TrayIcon();
         _tray.SettingsRequested += (_, _) => OpenSettings();
@@ -213,19 +224,40 @@ public partial class App : Application
             return;
         }
         var viewModel = new SettingsViewModel(_config,
-            (request, token) => new ClaudeCli(_config.Current.Settings.ClaudePath).RunAsync(request, token));
+            (request, token) => new ClaudeCli(_config.Current.Settings.ClaudePath).RunAsync(request, token), _ui);
         viewModel.Saved += (_, config) =>
         {
             _log.Write("settings", code: "Saved");
+            UiScale.Apply(_ui.Current.Scale);
             ApplyAutostart(config.Settings.Autostart);
             ApplyConfig(notify: true);
             ReloadConfig(); // clears a "fehlerhaft" state: the file is valid again
         };
-        _settings = new SettingsWindow(viewModel);
-        _settings.Closed += (_, _) => _settings = null;
-        _settings.Show();
-        _settings.Activate();
+        var window = new SettingsWindow(viewModel, _ui.Current.SettingsWindow, StepScale, _ui.Current.Scale);
+        window.Closing += (_, e) => { if (!e.Cancel) _ui.Update(s => s.SettingsWindow = window.CurrentBounds); };
+        window.Closed += (_, _) => { _settings = null; _settingsViewModel = null; };
+        _settings = window;
+        _settingsViewModel = viewModel;
+        window.Show();
+        window.Activate();
     }
+
+    /// <summary>Ctrl+Plus/Minus/0 or Ctrl+wheel in any window: +1, -1 or 0 (= 100 %).</summary>
+    private void StepScale(int direction)
+    {
+        var state = _ui.Update(s => s.Scale = UiState.StepScale(s.Scale, direction));
+        UiScale.Apply(state.Scale);
+        _settingsViewModel?.ReloadUi(state);
+    }
+
+    private void PopupWidthChanged(int width)
+    {
+        var state = _ui.Update(s => s.PopupWidth = width);
+        _settingsViewModel?.ReloadUi(state);
+    }
+
+    private PopupWindow CreatePopup(PopupViewModel viewModel, (int X, int Y) anchor) =>
+        new(viewModel, anchor, _ui.Current.PopupWidth, () => _ui.Current.ScaleFactor, StepScale, PopupWidthChanged);
 
     /// <summary>
     /// Only on "Speichern", not at every start: a test build started from bin\Debug must not
@@ -294,7 +326,7 @@ public partial class App : Application
             text => _clipboard.SetText(text));
         viewModel.RunCompleted += (_, run) => _log.Write("claude", run.ActionId, run.Duration, run.Error.ToString());
 
-        var popup = new PopupWindow(viewModel, anchor);
+        var popup = CreatePopup(viewModel, anchor);
         var closed = false;
         popup.Closed += (_, _) => { closed = true; if (_popup == popup) _popup = null; };
         viewModel.ReplaceRequested += async (_, text) =>
@@ -350,8 +382,8 @@ public partial class App : Application
                 await Task.Delay(400, token);
                 return new ClaudeResult(ClaudeErrorKind.None, "Das ist ein kurzer Beispieltext, mit dem sich die Aktion ausprobieren lässt.", null, null);
             };
-            var settingsViewModel = new SettingsViewModel(demoStore, fake);
-            var settingsWindow = new SettingsWindow(settingsViewModel);
+            var settingsViewModel = new SettingsViewModel(demoStore, fake, _ui);
+            var settingsWindow = new SettingsWindow(settingsViewModel, null, StepScale, _ui.Current.Scale);
             MainWindow = settingsWindow;
             settingsWindow.Show();
             switch (state)
@@ -404,7 +436,7 @@ public partial class App : Application
             ? new PopupViewModel(null, TextCapture.NoTextMessage, config, run, _ => { })
             : new PopupViewModel(sample, null, config, run, _ => { });
         var area = SystemParameters.WorkArea;
-        var popup = new PopupWindow(viewModel, ((int)(area.Width / 2 - 240), (int)(area.Height / 2 - 200)));
+        var popup = CreatePopup(viewModel, ((int)(area.Width / 2 - 240), (int)(area.Height / 2 - 200)));
         MainWindow = popup;
         // Start the action only after the popup is on screen, as in real use. Starting it before
         // Loaded hid the busy-bar crash: the bar was visible from the start there.

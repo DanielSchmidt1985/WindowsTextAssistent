@@ -14,14 +14,35 @@ public partial class SettingsWindow : Window
     private Point _dragStart;
     private ActionEditorViewModel? _dragItem;
 
-    public SettingsWindow(SettingsViewModel viewModel)
+    /// <param name="bounds">Last size and position, or null for the default (centered).</param>
+    /// <param name="stepScale">Ctrl+Plus/Minus/0 and Ctrl+wheel: +1, -1 or 0.</param>
+    public SettingsWindow(SettingsViewModel viewModel, Core.Config.WindowBounds? bounds = null, Action<int>? stepScale = null, int scalePercent = 100)
     {
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = viewModel;
         SourceInitialized += (_, _) => DarkTitleBar.Apply(this);
         InputBindings.Add(new KeyBinding(viewModel.SaveCommand, Key.S, ModifierKeys.Control));
+        UiScale.UpdateTextMode(this, scalePercent);
+        if (stepScale is not null)
+            UiScale.AttachShortcuts(this, stepScale);
+        if (bounds is not null && IsOnScreen(bounds))
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            (Left, Top, Width, Height) = (bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+        }
     }
+
+    /// <summary>Size and position to remember (the normal bounds, also when maximized).</summary>
+    public Core.Config.WindowBounds CurrentBounds =>
+        new(RestoreBounds.Left, RestoreBounds.Top, RestoreBounds.Width, RestoreBounds.Height);
+
+    /// <summary>A monitor may be gone since last time; then open centered instead of off-screen.</summary>
+    private static bool IsOnScreen(Core.Config.WindowBounds b) =>
+        b.Left + 100 < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth
+        && b.Left + b.Width - 100 > SystemParameters.VirtualScreenLeft
+        && b.Top >= SystemParameters.VirtualScreenTop - 10
+        && b.Top + 40 < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight;
 
     protected override void OnClosing(CancelEventArgs e)
     {

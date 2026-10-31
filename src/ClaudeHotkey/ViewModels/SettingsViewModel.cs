@@ -29,12 +29,21 @@ public sealed class SettingsViewModel : ObservableObject
     private string _claudePath = "";
     private string _status = "";
     private bool _statusIsError;
+    private readonly UiStateStore _ui;
+    private string _scale = "";
+    private string _popupWidth = "";
+    private (string Scale, string Width) _savedUi;
 
-    public SettingsViewModel(ActionConfigStore store, PopupViewModel.RunClaude run)
+    /// <param name="ui">Look and window sizes (ui.json); defaults to the file next to actions.json.</param>
+    public SettingsViewModel(ActionConfigStore store, PopupViewModel.RunClaude run, UiStateStore? ui = null)
     {
         _store = store;
         _run = run;
+        _ui = ui ?? new UiStateStore(store.Directory);
+        if (ui is null)
+            _ui.Load();
         Load(store.Current);
+        LoadUi(_ui.Current);
         _savedJson = BuildJsonOrEmpty();
 
         NewCommand = new RelayCommand(AddNew);
@@ -76,6 +85,25 @@ public sealed class SettingsViewModel : ObservableObject
     public bool Autostart { get => _autostart; set => Set(ref _autostart, value); }
     public string ClaudePath { get => _claudePath; set => Set(ref _claudePath, value); }
 
+    /// <summary>Scale of text and controls in percent (ui.json).</summary>
+    public string Scale { get => _scale; set => Set(ref _scale, value); }
+
+    /// <summary>Popup width in pixels (ui.json); also changed by dragging the popup's right edge.</summary>
+    public string PopupWidth { get => _popupWidth; set => Set(ref _popupWidth, value); }
+
+    /// <summary>
+    /// Ctrl+wheel or dragging the popup changed ui.json while the dialog is open: show the new
+    /// values, so "Speichern" does not put the old ones back.
+    /// </summary>
+    public void ReloadUi(UiState state) => LoadUi(state);
+
+    private void LoadUi(UiState state)
+    {
+        Scale = state.Scale.ToString(CultureInfo.InvariantCulture);
+        PopupWidth = state.PopupWidth.ToString(CultureInfo.InvariantCulture);
+        _savedUi = (Scale, PopupWidth);
+    }
+
     public string Status
     {
         get => _status;
@@ -95,7 +123,7 @@ public sealed class SettingsViewModel : ObservableObject
     public ICommand MoveDownCommand { get; }
     public ICommand SaveCommand { get; }
 
-    public bool IsDirty => BuildJsonOrEmpty() != _savedJson;
+    public bool IsDirty => BuildJsonOrEmpty() != _savedJson || (Scale, PopupWidth) != _savedUi;
 
     /// <summary>Moves an action (drag and drop). The order is the order of the popup buttons.</summary>
     public void Move(int from, int to)
@@ -116,9 +144,10 @@ public sealed class SettingsViewModel : ObservableObject
     public bool Save()
     {
         var (config, parseErrors) = Build();
-        if (config is null)
+        var uiErrors = ValidateUi(out var scale, out var popupWidth);
+        if (config is null || uiErrors.Count > 0)
         {
-            ShowErrors(parseErrors);
+            ShowErrors([.. parseErrors, .. uiErrors]);
             return false;
         }
         try
@@ -135,6 +164,11 @@ public sealed class SettingsViewModel : ObservableObject
             SetStatus($"Speichern fehlgeschlagen: {ex.Message}", isError: true);
             return false;
         }
+        LoadUi(_ui.Update(s =>
+        {
+            s.Scale = scale;
+            s.PopupWidth = popupWidth;
+        }));
 
         ShowErrors([]);
         foreach (var action in Actions)
@@ -238,6 +272,22 @@ public sealed class SettingsViewModel : ObservableObject
         };
         var config = new ActionConfig { Settings = settings, Actions = Actions.Select(a => a.ToDefinition()).ToList() };
         return errors.Count > 0 ? (null, errors) : (config, []);
+    }
+
+    private List<ConfigError> ValidateUi(out int scale, out int popupWidth)
+    {
+        var errors = new List<ConfigError>();
+        int Range(string text, string field, int min, int max, string label)
+        {
+            if (!int.TryParse(text.Trim().TrimEnd('%', ' '), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+                errors.Add(new ConfigError(null, field, "Bitte eine ganze Zahl eingeben.", $"{label}: keine ganze Zahl."));
+            else if (value < min || value > max)
+                errors.Add(new ConfigError(null, field, $"Muss zwischen {min} und {max} liegen.", $"{label}: zwischen {min} und {max}."));
+            return value;
+        }
+        scale = Range(Scale, "scale", UiState.MinScale, UiState.MaxScale, "Skalierung");
+        popupWidth = Range(PopupWidth, "popupWidth", UiState.MinPopupWidth, UiState.MaxPopupWidth, "Popup-Breite");
+        return errors;
     }
 
     private string BuildJsonOrEmpty() => Build().Config?.ToJson() ?? "";

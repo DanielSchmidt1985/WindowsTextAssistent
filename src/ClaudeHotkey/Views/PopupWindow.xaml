@@ -7,13 +7,23 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" Topmost="True" ShowActivated="True"
         FontFamily="{StaticResource UiFont}" FontSize="{StaticResource FontSize}"
-        Foreground="{DynamicResource TextBrush}" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
-    <!-- 12 px transparent margin leaves room for the shadow -->
+        Foreground="{DynamicResource TextBrush}" UseLayoutRounding="True">
+    <!-- 12 px transparent margin leaves room for the shadow; UiScale scales everything inside -->
     <Border Margin="12" Background="{DynamicResource BgBrush}" BorderBrush="{DynamicResource BorderBrush}"
-            BorderThickness="1" CornerRadius="{StaticResource PopupRadius}">
+            BorderThickness="1" CornerRadius="{StaticResource PopupRadius}" LayoutTransform="{DynamicResource UiScale}">
         <Border.Effect>
             <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.45" Color="Black" />
         </Border.Effect>
+        <Grid>
+        <!-- Right edge: drag to change the width (remembered in ui.json) -->
+        <Thumb x:Name="WidthGrip" HorizontalAlignment="Right" Width="6" Cursor="SizeWE" Panel.ZIndex="1"
+               ToolTip="Breite ziehen" DragDelta="WidthGrip_DragDelta" DragCompleted="WidthGrip_DragCompleted">
+            <Thumb.Template>
+                <ControlTemplate TargetType="Thumb">
+                    <Border Background="Transparent" />
+                </ControlTemplate>
+            </Thumb.Template>
+        </Thumb>
         <StackPanel Margin="12,8,12,12">
 
             <!-- Header: drag area, text size, close -->
@@ -67,7 +77,7 @@
             </StackPanel>
 
             <!-- Result -->
-            <TextBox Style="{StaticResource ReadOnlyText}" Text="{Binding ResultText, Mode=OneWay}" Margin="0,4,0,0"
+            <TextBox x:Name="ResultBox" Style="{StaticResource ReadOnlyText}" Text="{Binding ResultText, Mode=OneWay}" Margin="0,4,0,0"
                      MaxHeight="320" Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
 
             <!-- Feedback: for reading only, "Ersetzen" and "Kopieren" take the result above -->
@@ -75,7 +85,7 @@
                     Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource Muted}" Text="FEEDBACK" FontSize="11" FontWeight="SemiBold" />
-                    <TextBox Style="{StaticResource ReadOnlyText}" Text="{Binding FeedbackText, Mode=OneWay}" Margin="-4,2,0,0"
+                    <TextBox x:Name="FeedbackBox" Style="{StaticResource ReadOnlyText}" Text="{Binding FeedbackText, Mode=OneWay}" Margin="-4,2,0,0"
                              MaxHeight="220" Background="Transparent" BorderThickness="0" Padding="4,2" />
                 </StackPanel>
             </Border>
@@ -105,5 +115,6 @@
                         Visibility="{Binding CanReplace, Converter={StaticResource BoolToVisibility}}" />
             </StackPanel>
         </StackPanel>
+        </Grid>
     </Border>
 </Window>

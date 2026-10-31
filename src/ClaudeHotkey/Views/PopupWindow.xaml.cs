@@ -12,25 +12,59 @@ public partial class PopupWindow : Window
 {
     private readonly PopupViewModel _viewModel;
     private readonly (int X, int Y) _anchor;
+    private readonly Func<double> _scale;
+    private readonly Action<int> _widthChanged;
+    private bool _movedByUser;
 
     /// <param name="anchor">Mouse position in physical pixels at the moment of the trigger.</param>
-    public PopupWindow(PopupViewModel viewModel, (int X, int Y) anchor)
+    /// <param name="width">Remembered popup width in DIPs.</param>
+    /// <param name="scale">Current UI scale factor (1.0 = 100 %).</param>
+    /// <param name="stepScale">Ctrl+Plus/Minus/0 and Ctrl+wheel: +1, -1 or 0.</param>
+    /// <param name="widthChanged">Called with the new width after the user dragged the right edge.</param>
+    public PopupWindow(PopupViewModel viewModel, (int X, int Y) anchor, int width, Func<double> scale, Action<int> stepScale, Action<int> widthChanged)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _anchor = anchor;
+        _scale = scale;
+        _widthChanged = widthChanged;
         DataContext = viewModel;
+        Width = width;
+        UiScale.UpdateTextMode(this, (int)Math.Round(scale() * 100));
+        UiScale.AttachShortcuts(this, stepScale);
 
         viewModel.CloseRequested += (_, _) => Close();
         viewModel.InputRequested += (_, _) => Dispatcher.BeginInvoke(() => { InputBox.Focus(); Keyboard.Focus(InputBox); });
 
         SourceInitialized += (_, _) => Place();
-        // The window grows when the result arrives; keep it inside the screen.
-        SizeChanged += (_, _) => Place();
-        Loaded += (_, _) => ForegroundWindow.Activate(new WindowInteropHelper(this).Handle);
+        // The window grows when the result arrives; keep it inside the screen (unless the user moved it).
+        SizeChanged += (_, _) => { if (!_movedByUser) Place(); };
+        Loaded += (_, _) =>
+        {
+            UpdateMaxHeights();
+            ForegroundWindow.Activate(new WindowInteropHelper(this).Handle);
+        };
+        LayoutUpdated += (_, _) => UpdateMaxHeights();
     }
 
     private void Place() => ForegroundWindow.PlaceNear(new WindowInteropHelper(this).Handle, _anchor.X, _anchor.Y);
+
+    /// <summary>Result and feedback may use about half / a third of the screen before they scroll.</summary>
+    private void UpdateMaxHeights()
+    {
+        var available = SystemParameters.WorkArea.Height / _scale();
+        ResultBox.MaxHeight = Math.Max(120, available * 0.45);
+        FeedbackBox.MaxHeight = Math.Max(80, available * 0.3);
+    }
+
+    private void WidthGrip_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        // The thumb sits inside the scaled content, so its offsets are in unscaled units.
+        Width = Math.Clamp(Width + e.HorizontalChange * _scale(), Core.Config.UiState.MinPopupWidth, Core.Config.UiState.MaxPopupWidth);
+    }
+
+    private void WidthGrip_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e) =>
+        _widthChanged((int)Math.Round(Width));
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
@@ -63,8 +97,10 @@ public partial class PopupWindow : Window
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed)
-            DragMove();
+        if (e.ButtonState != MouseButtonState.Pressed)
+            return;
+        DragMove();
+        _movedByUser = true; // from now on growing must not snap it back to the mouse
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

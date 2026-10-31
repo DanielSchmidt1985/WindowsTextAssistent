@@ -167,6 +167,55 @@ public class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Scale_and_popup_width_go_to_ui_json()
+    {
+        var (vm, store) = Create();
+        Assert.Equal("100", vm.Scale);
+        Assert.Equal("464", vm.PopupWidth);
+
+        vm.Scale = "130 %";
+        vm.PopupWidth = "720";
+        Assert.True(vm.IsDirty);
+        Assert.True(vm.Save());
+
+        var ui = new UiStateStore(_dir.FullName).Load();
+        Assert.Equal(130, ui.Scale);
+        Assert.Equal(720, ui.PopupWidth);
+        var actions = File.ReadAllText(store.FilePath);
+        Assert.DoesNotContain("popupWidth", actions); // the look lives in ui.json only
+        Assert.DoesNotContain("\"scale\"", actions);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Theory]
+    [InlineData("50", "800", "scale")]
+    [InlineData("100", "100", "popupWidth")]
+    [InlineData("groß", "800", "scale")]
+    public void Invalid_look_values_are_errors(string scale, string width, string field)
+    {
+        var (vm, _) = Create();
+        vm.Scale = scale;
+        vm.PopupWidth = width;
+
+        Assert.False(vm.Save());
+        Assert.NotNull(vm.GeneralErrors[field]);
+    }
+
+    [Fact]
+    public void Changes_from_outside_update_the_fields()
+    {
+        var ui = new UiStateStore(_dir.FullName);
+        var store = new ActionConfigStore(_dir.FullName, DefaultConfig.Json);
+        store.Reload();
+        var vm = new SettingsViewModel(store, (_, _) => Task.FromResult(new ClaudeResult(ClaudeErrorKind.None, "x", null, null)), ui);
+
+        vm.ReloadUi(ui.Update(s => s.Scale = 150)); // e.g. Ctrl+wheel in the popup
+
+        Assert.Equal("150", vm.Scale);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
     public void Main_hotkey_is_saved()
     {
         var (vm, store) = Create();

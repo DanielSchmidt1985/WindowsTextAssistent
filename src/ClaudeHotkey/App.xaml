@@ -9,6 +9,7 @@
                 <ResourceDictionary Source="Themes/Theme.Neptun.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+            <!-- "UiScale" (the shared ScaleTransform) is added in code at startup, see Views/UiScale.cs -->
             <views:NullToVisibilityConverter x:Key="NullToVisible" />
             <views:NullToVisibilityConverter x:Key="NotNullToVisible" Invert="True" />
             <views:NonEmptyToVisibilityConverter x:Key="NonEmptyToVisible" />

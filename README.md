@@ -45,6 +45,12 @@ Das Popup öffnet sich an der Maus.
 - **Kopieren** legt das Ergebnis in die Zwischenablage und schließt das Popup.
 - **Ersetzen** (oder **Enter**) setzt das Ergebnis anstelle der Markierung ins Quellfenster ein. Nur bei Aktionen mit
   `"replace": true`. Danach steht die Zwischenablage wieder so wie vor dem Ersetzen.
+- **Größe und Schrift:** Am rechten Rand des Popups ziehen ändert die Breite; sie wird gemerkt. Die Höhe wächst mit
+  dem Inhalt, Ergebnis und Feedback scrollen erst ab etwa der halben bzw. einem Drittel der Bildschirmhöhe.
+  **Strg+Mausrad** oder **Strg+Plus/Minus** skaliert Schrift und Bedienelemente (75–200 %, Strg+0 = 100 %), im Popup
+  wie in den Einstellungen und für alle Fenster zugleich.
+- **Eingabefeld im Popup** (`askInput`): Die Aktion fragt zuerst nach einer Anweisung, die `{input}` im Prompt
+  ersetzt. So arbeitet „Freitext“.
 - **Feedback:** Hat eine Aktion ein `feedback`, steht unter dem Ergebnis ein Bereich „Feedback“ (z. B. ein
   Sprach-Coaching). Er ist nur zum Lesen: Ersetzen und Kopieren nehmen ausschließlich das Ergebnis. Ohne Feedback
   (etwa bei deutschem Text, wenn das Coaching nur für Englisch gedacht ist) bleibt der Bereich weg.
@@ -89,6 +95,18 @@ gelten ohne Neustart.
 - Ist die Datei fehlerhaft, bleibt die zuletzt gültige Konfiguration aktiv; das Tray meldet die Fehler.
 - Zusätzlich zum Plan: `settings.autostart`, `settings.claudePath` und pro Aktion `hotkey` und `enabled`
   (für den Einstellungsdialog). `enabled: false` blendet eine Aktion im Popup aus.
+
+### Darstellung (ui.json)
+
+`%APPDATA%\ClaudeHotkey\ui.json` hält Skalierung (`scale`, Prozent), Popup-Breite (`popupWidth`) und Größe und
+Position des Einstellungsfensters. Getrennt von `actions.json`, weil das Ziehen am Popup die Datei jederzeit
+schreibt und nicht mit dem Speichern im Einstellungsdialog konkurrieren soll. In den Einstellungen stehen Skalierung
+und Breite unter „Allgemein → Darstellung“. Werte außerhalb der Grenzen werden beim Laden angepasst, eine
+kaputte Datei fällt auf die Standardwerte zurück.
+
+Skaliert wird mit einer gemeinsamen `ScaleTransform` als `LayoutTransform` an der Wurzel jedes Fensters
+(`Views/UiScale.cs`). Sie lässt sich nicht verändern, weil `Application.Resources` Freezables beim Einfügen einfriert;
+bei jeder Änderung kommt deshalb eine neue hinein, und die Fenster folgen per `DynamicResource`.
 
 ### Design anpassen
 
