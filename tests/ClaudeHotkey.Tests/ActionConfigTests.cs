@@ -37,7 +37,17 @@ public class ActionConfigTests : IDisposable
         Assert.False(action.AskInput);
         Assert.Equal("haiku", action.EffectiveModel(config.Settings));
         Assert.Equal(60, config.Settings.TimeoutSeconds);
-        Assert.Equal("ctrl+alt+space", config.Settings.SecondHotkey);
+        Assert.Equal("ctrl+c+c", config.Settings.MainHotkey);
+    }
+
+    [Fact]
+    public void Old_file_with_second_hotkey_still_loads()
+    {
+        // actions.json written before the main hotkey became configurable.
+        var config = ActionConfig.Parse(Json("""{ "id": "a", "label": "A", "prompt": "P" }""", "\"secondHotkey\": \"ctrl+alt+space\""));
+
+        Assert.Equal("ctrl+c+c", config.Settings.MainHotkey);
+        Assert.DoesNotContain("secondHotkey", config.ToJson()); // gone after the next save
     }
 
     [Fact]
@@ -76,10 +86,10 @@ public class ActionConfigTests : IDisposable
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "askInput": true }""", "{input}")]
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "shift+x" }""", "keine gültige")]
     [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+1" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "Strg+Alt+1" }""", "schon für „A“")]
-    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+space" }""", "schon für den zweiten Hotkey")]
-    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+c+c" }""", "schon für Strg+C+C")]
-    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+c" }""", "schon für Strg+C+C")]
-    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+x" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "ctrl+x+x" }""", "schon für „A“")]
+    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+c+c" }""", "schon für den Haupt-Hotkey")]
+    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+c" }""", "normales Kopieren")]
+    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+v" }""", "normales Kopieren")]
+    [InlineData("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+k" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "ctrl+alt+k+k" }""", "schon für „A“")]
     public void Invalid_actions_are_rejected(string actions, string expected)
     {
         var ex = Assert.Throws<ActionConfigException>(() => ActionConfig.Parse(Json(actions)));
@@ -90,7 +100,9 @@ public class ActionConfigTests : IDisposable
     [Theory]
     [InlineData("\"doubleCopyMs\": 50", "doubleCopyMs")]
     [InlineData("\"timeoutSeconds\": 0", "timeoutSeconds")]
-    [InlineData("\"secondHotkey\": \"x\"", "secondHotkey")]
+    [InlineData("\"mainHotkey\": \"x\"", "mainHotkey")]
+    [InlineData("\"mainHotkey\": \"\"", "Ohne Haupt-Hotkey")]
+    [InlineData("\"mainHotkey\": \"ctrl+c\"", "normales Kopieren")]
     [InlineData("\"model\": \"\"", "model")]
     public void Invalid_settings_are_rejected(string settings, string expected)
     {
@@ -100,32 +112,41 @@ public class ActionConfigTests : IDisposable
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("  ")]
-    public void Second_hotkey_may_be_empty(string value)
+    [InlineData("ctrl+alt+space")]
+    [InlineData("ctrl+x+x")]
+    [InlineData("ctrl+alt+c+c")]
+    public void Main_hotkey_can_be_changed(string mainHotkey)
     {
-        var config = ActionConfig.Parse(Json("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+space" }""",
-            $"\"secondHotkey\": \"{value}\""));
+        var config = ActionConfig.Parse(Json("", $"\"mainHotkey\": \"{mainHotkey}\""));
 
-        Assert.Equal("ctrl+alt+space", config.Actions[0].Hotkey); // free for an action now
+        Assert.Equal(mainHotkey, config.Settings.MainHotkey);
+    }
+
+    [Fact]
+    public void Ctrl_c_c_is_free_for_an_action_when_main_hotkey_moved()
+    {
+        var config = ActionConfig.Parse(Json("""{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+c+c" }""",
+            "\"mainHotkey\": \"ctrl+alt+space\""));
+
+        Assert.Equal("ctrl+c+c", config.Actions[0].Hotkey);
+    }
+
+    [Fact]
+    public void Action_hotkey_on_main_hotkey_is_rejected()
+    {
+        var ex = Assert.Throws<ActionConfigException>(() => ActionConfig.Parse(Json(
+            """{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+alt+space" }""", "\"mainHotkey\": \"ctrl+alt+space\"")));
+
+        Assert.Contains(ex.Errors, e => e.Contains("schon für den Haupt-Hotkey"));
     }
 
     [Fact]
     public void Double_press_hotkeys_are_accepted()
     {
         var config = ActionConfig.Parse(Json(
-            """{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+x+x" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "ctrl+alt+q+q" }""",
-            "\"secondHotkey\": \"ctrl+y+y\""));
+            """{ "id": "a", "label": "A", "prompt": "P", "hotkey": "ctrl+x+x" }, { "id": "b", "label": "B", "prompt": "Q", "hotkey": "ctrl+alt+q+q" }"""));
 
         Assert.Equal(2, config.Actions.Count);
-    }
-
-    [Fact]
-    public void Second_hotkey_on_ctrl_c_c_is_rejected()
-    {
-        var ex = Assert.Throws<ActionConfigException>(() => ActionConfig.Parse(Json("", "\"secondHotkey\": \"ctrl+c+c\"")));
-
-        Assert.Contains(ex.Errors, e => e.Contains("Strg+C+C"));
     }
 
     [Fact]

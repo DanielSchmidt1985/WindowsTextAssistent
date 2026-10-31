@@ -77,20 +77,9 @@ public partial class App : Application
         _capture = new TextCapture(new SystemClipboard(_clipboard), new KeyboardInput());
 
         _hook = new KeyboardHook(settings.DoubleCopyMs);
-        _hook.DoublePress += (_, args) =>
-        {
-            if (args.Gesture == HotkeyGesture.DoubleCopy)
-                Capture("double-copy", () => _capture.AfterUserCopyAsync(args.ClipboardSequence), null);
-            else if (_hotkeyTargets.TryGetValue(args.Gesture, out var actionId))
-                Capture(actionId is null ? "second-hotkey" : "action-hotkey", () => CaptureForDoublePress(args), actionId);
-        };
-
+        _hook.DoublePress += (_, args) => OnHotkey(args.Gesture, args.ClipboardSequence);
         _hotkeys = new GlobalHotkeys();
-        _hotkeys.Pressed += (_, gesture) =>
-        {
-            if (_hotkeyTargets.TryGetValue(gesture, out var actionId))
-                Capture(actionId is null ? "second-hotkey" : "action-hotkey", () => _capture.BySendingCopyAsync(gesture.VirtualKey), actionId);
-        };
+        _hotkeys.Pressed += (_, gesture) => OnHotkey(gesture, ClipboardService.SequenceNumber);
         RegisterHotkeys(notifyWhenTaken: true);
 
         // While a hotkey field in the settings has focus, the combination must reach the field.
@@ -124,16 +113,23 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// A configured double press other than Ctrl+C+C. With Ctrl+X+X the app has already cut the
-    /// text into the clipboard, like Ctrl+C+C copies it; for any other key the tool copies itself.
+    /// Main hotkey or an action's hotkey was pressed. With Ctrl+C+C and Ctrl+X+X the app has
+    /// already copied (cut) the text; for any other combination the tool copies itself.
     /// </summary>
-    private Task<CaptureResult> CaptureForDoublePress(DoublePressEventArgs args) =>
-        args.Gesture is { VirtualKey: 'X', Modifiers: HotkeyModifiers.Ctrl }
-            ? _capture!.AfterUserCopyAsync(args.ClipboardSequence)
-            : _capture!.BySendingCopyAsync(args.Gesture.VirtualKey);
+    /// <param name="clipboardSequence">Clipboard sequence number at the (second) press.</param>
+    private void OnHotkey(HotkeyGesture gesture, uint clipboardSequence)
+    {
+        if (_capture is null || !_hotkeyTargets.TryGetValue(gesture, out var actionId))
+            return;
+        Capture(actionId is null ? "main-hotkey" : "action-hotkey",
+            gesture.AppCopiesItself
+                ? () => _capture.AfterUserCopyAsync(clipboardSequence)
+                : () => _capture.BySendingCopyAsync(gesture.VirtualKey),
+            actionId);
+    }
 
     /// <summary>
-    /// (Re)registers the second hotkey and the hotkeys of all active actions from the current
+    /// (Re)registers the main hotkey and the hotkeys of all active actions from the current
     /// config: single presses with RegisterHotKey, double presses in the keyboard hook.
     /// </summary>
     private void RegisterHotkeys(bool notifyWhenTaken)
@@ -144,15 +140,13 @@ public partial class App : Application
         _hotkeyTargets.Clear();
 
         var config = _config.Current;
-        var wanted = new List<(string Text, string? ActionId, string Name)>();
-        if (!string.IsNullOrWhiteSpace(config.Settings.SecondHotkey))
-            wanted.Add((config.Settings.SecondHotkey, null, "zweiter Hotkey"));
+        var wanted = new List<(string Text, string? ActionId, string Name)> { (config.Settings.MainHotkey, null, "Haupt-Hotkey") };
         wanted.AddRange(config.EnabledActions
             .Where(a => !string.IsNullOrWhiteSpace(a.Hotkey))
             .Select(a => (a.Hotkey!, (string?)a.Id, $"„{a.Label}“")));
 
         var taken = new List<string>();
-        var doublePresses = new List<HotkeyGesture> { HotkeyGesture.DoubleCopy };
+        var doublePresses = new List<HotkeyGesture>();
         foreach (var (text, actionId, name) in wanted)
         {
             if (!HotkeyGesture.TryParse(text, out var gesture))
@@ -368,7 +362,7 @@ public partial class App : Application
                 case "settings-errors":
                     // A broken new action plus a duplicate hotkey, then "Speichern".
                     settingsViewModel.NewCommand.Execute(null);
-                    settingsViewModel.Selected!.Hotkey = "ctrl+alt+space";
+                    settingsViewModel.Selected!.Hotkey = "ctrl+c+c";
                     settingsViewModel.Save();
                     break;
                 case "settings-test":

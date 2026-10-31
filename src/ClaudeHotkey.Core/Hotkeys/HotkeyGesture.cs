@@ -20,8 +20,20 @@ public enum HotkeyModifiers : uint
 /// </summary>
 public sealed record HotkeyGesture(HotkeyModifiers Modifiers, int VirtualKey, bool IsDoublePress = false)
 {
-    /// <summary>The built-in trigger, always active and reserved.</summary>
+    /// <summary>Ctrl+C+C, the default main hotkey.</summary>
     public static readonly HotkeyGesture DoubleCopy = new(HotkeyModifiers.Ctrl, 'C', IsDoublePress: true);
+
+    /// <summary>
+    /// Ctrl+C+C or Ctrl+X+X: the app copies (or cuts) the selection itself on the first press,
+    /// so the tool takes it from the clipboard. For every other gesture the tool sends Ctrl+C.
+    /// </summary>
+    public bool AppCopiesItself => IsDoublePress && Modifiers == HotkeyModifiers.Ctrl && VirtualKey is 'C' or 'X';
+
+    /// <summary>
+    /// Ctrl+C, Ctrl+X or Ctrl+V as a single press: RegisterHotKey would take the key away from
+    /// every other program, so copying, cutting or pasting would stop working.
+    /// </summary>
+    public bool BlocksClipboardKeys => !IsDoublePress && Modifiers == HotkeyModifiers.Ctrl && VirtualKey is 'C' or 'X' or 'V';
 
     private static readonly Dictionary<string, HotkeyModifiers> ModifierNames = new(StringComparer.OrdinalIgnoreCase)
     {

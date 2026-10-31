@@ -1,7 +1,7 @@
 {
   "settings": {
     "doubleCopyMs": 400,
-    "secondHotkey": "ctrl+alt+space",
+    "mainHotkey": "ctrl+c+c",
     "model": "haiku",
     "timeoutSeconds": 60,
     "pasteDelayMs": 500,

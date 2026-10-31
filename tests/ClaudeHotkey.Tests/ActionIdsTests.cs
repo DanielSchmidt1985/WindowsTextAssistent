@@ -30,7 +30,7 @@ public class ActionIdsTests
             Actions =
             [
                 new ActionDefinition { Id = "a", Label = "A", Prompt = "P" },
-                new ActionDefinition { Id = "b", Label = "B", Prompt = " ", Hotkey = "ctrl+alt+space" },
+                new ActionDefinition { Id = "b", Label = "B", Prompt = " ", Hotkey = "ctrl+c+c" },
             ],
         };
         config.Settings.TimeoutSeconds = 1;
@@ -39,7 +39,7 @@ public class ActionIdsTests
 
         Assert.Contains(errors, e => e is { ActionIndex: null, Field: "timeoutSeconds" });
         Assert.Contains(errors, e => e is { ActionIndex: 1, Field: "prompt" });
-        Assert.Contains(errors, e => e is { ActionIndex: 1, Field: "hotkey" } && e.FieldMessage.Contains("zweiten Hotkey"));
+        Assert.Contains(errors, e => e is { ActionIndex: 1, Field: "hotkey" } && e.FieldMessage.Contains("Haupt-Hotkey"));
         Assert.DoesNotContain(errors, e => e.ActionIndex == 0);
     }
 }

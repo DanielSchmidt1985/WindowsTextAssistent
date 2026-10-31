@@ -8,8 +8,8 @@ namespace ClaudeHotkey.Core.Config;
 public sealed class AppSettings
 {
     public int DoubleCopyMs { get; set; } = 400;
-    /// <summary>Empty: no second hotkey, only Ctrl+C+C and the actions' own hotkeys.</summary>
-    public string SecondHotkey { get; set; } = "ctrl+alt+space";
+    /// <summary>Opens the popup with the selected text. Single or double press, e.g. "ctrl+c+c".</summary>
+    public string MainHotkey { get; set; } = "ctrl+c+c";
     public string Model { get; set; } = "haiku";
     public int TimeoutSeconds { get; set; } = 60;
 
@@ -110,21 +110,20 @@ public sealed class ActionConfig
             Setting("pasteDelayMs", "Muss zwischen 100 und 5000 liegen.");
         if (string.IsNullOrWhiteSpace(Settings.Model))
             Setting("model", "Darf nicht leer sein.");
-        // Taken key combinations and who has them. Ctrl+C+C is built in; a single Ctrl+C would
-        // also break normal copying, so anything on Ctrl+C counts as taken.
-        var hotkeys = new List<(HotkeyGesture Gesture, string Owner)> { (HotkeyGesture.DoubleCopy, "Strg+C+C") };
+        // Taken key combinations and who has them. Single and double press of the same keys
+        // (Ctrl+X and Ctrl+X+X) exclude each other.
+        var hotkeys = new List<(HotkeyGesture Gesture, string Owner)>();
         string? TakenBy(HotkeyGesture gesture) => hotkeys.FirstOrDefault(h => h.Gesture.SharesKeysWith(gesture)).Owner;
+        const string ClipboardKeys = "würde normales Kopieren, Ausschneiden oder Einfügen blockieren. Als Doppeldruck geht es, z. B. Strg+C+C.";
 
-        // Empty means: no second hotkey.
-        if (!string.IsNullOrWhiteSpace(Settings.SecondHotkey))
-        {
-            if (!HotkeyGesture.TryParse(Settings.SecondHotkey, out var secondHotkey))
-                Setting("secondHotkey", $"„{Settings.SecondHotkey}“ ist keine gültige Tastenkombination.");
-            else if (TakenBy(secondHotkey) is { } owner)
-                Setting("secondHotkey", $"{secondHotkey} ist schon für {owner} vergeben.");
-            else
-                hotkeys.Add((secondHotkey, "den zweiten Hotkey"));
-        }
+        if (string.IsNullOrWhiteSpace(Settings.MainHotkey))
+            Setting("mainHotkey", "Ohne Haupt-Hotkey lässt sich das Popup nicht öffnen.");
+        else if (!HotkeyGesture.TryParse(Settings.MainHotkey, out var mainHotkey))
+            Setting("mainHotkey", $"„{Settings.MainHotkey}“ ist keine gültige Tastenkombination.");
+        else if (mainHotkey.BlocksClipboardKeys)
+            Setting("mainHotkey", $"{mainHotkey} {ClipboardKeys}");
+        else
+            hotkeys.Add((mainHotkey, "den Haupt-Hotkey"));
 
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -150,6 +149,8 @@ public sealed class ActionConfig
             {
                 if (!HotkeyGesture.TryParse(action.Hotkey, out var gesture))
                     Field("hotkey", $"hotkey „{action.Hotkey}“ ist keine gültige Tastenkombination.");
+                else if (gesture.BlocksClipboardKeys)
+                    Field("hotkey", $"hotkey {gesture} {ClipboardKeys}");
                 else if (TakenBy(gesture) is { } owner)
                     Field("hotkey", $"hotkey {gesture} ist schon für {owner} vergeben.");
                 else

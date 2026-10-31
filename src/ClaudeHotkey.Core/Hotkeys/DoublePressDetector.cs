@@ -1,7 +1,8 @@
 namespace ClaudeHotkey.Core.Hotkeys;
 
 /// <summary>
-/// Recognises double presses such as Ctrl+C+C or Ctrl+X+X: modifiers held, key pressed twice
+/// Recognises double presses such as Ctrl+C+C or Ctrl+X+X (by default only Ctrl+C+C; the app
+/// sets <see cref="Gestures"/> from the configuration): modifiers held, key pressed twice
 /// within a time window. Pure state machine without Win32, fed by <see cref="KeyboardHook"/>.
 /// Modifiers must match exactly, auto-repeat (key held down) does not count as a second press,
 /// and any other key in between starts over.

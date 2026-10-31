@@ -173,7 +173,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zeitfenster für Doppeldruck wie Strg+C+C (ms)" Margin="0,0,0,4" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zeitfenster für Doppeldruck (ms)" Margin="0,0,0,4" />
                             <TextBox Text="{Binding DoubleCopyMs, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[doubleCopyMs]}" />
 
@@ -188,11 +188,11 @@
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[pasteDelayMs]}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zweiter Hotkey (optional)" Margin="0,0,0,4" />
-                            <local:HotkeyTextBox Style="{StaticResource {x:Type TextBox}}" Text="{Binding SecondHotkey}" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Haupt-Hotkey (öffnet das Popup)" Margin="0,0,0,4" />
+                            <local:HotkeyTextBox Style="{StaticResource {x:Type TextBox}}" Text="{Binding MainHotkey}" />
                             <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Kopiert selbst und öffnet das Popup. Doppeldruck möglich, Entf = keiner." />
-                            <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[secondHotkey]}" />
+                                       Text="Standard Strg+C+C. Für Doppeldruck die Taste zweimal drücken. Bei Strg+C+C und Strg+X+X kopiert das Programm selbst, sonst kopiert das Tool und stellt die Zwischenablage wieder her." />
+                            <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[mainHotkey]}" />
 
                             <TextBlock Style="{StaticResource FieldLabel}" Text="Timeout (Sekunden)" />
                             <TextBox Text="{Binding TimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />

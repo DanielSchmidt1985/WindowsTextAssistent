@@ -20,7 +20,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string _savedJson;
     private ActionEditorViewModel? _selected;
     private string _doubleCopyMs = "";
-    private string _secondHotkey = "";
+    private string _mainHotkey = "";
     private string _model = "";
     private string _timeoutSeconds = "";
     private string _pasteDelayMs = "";
@@ -68,7 +68,7 @@ public sealed class SettingsViewModel : ObservableObject
     public FieldErrors GeneralErrors { get; } = new();
 
     public string DoubleCopyMs { get => _doubleCopyMs; set => Set(ref _doubleCopyMs, value); }
-    public string SecondHotkey { get => _secondHotkey; set => Set(ref _secondHotkey, value); }
+    public string MainHotkey { get => _mainHotkey; set => Set(ref _mainHotkey, value); }
     public string Model { get => _model; set => Set(ref _model, value); }
     public string TimeoutSeconds { get => _timeoutSeconds; set => Set(ref _timeoutSeconds, value); }
     public string PasteDelayMs { get => _pasteDelayMs; set => Set(ref _pasteDelayMs, value); }
@@ -149,7 +149,7 @@ public sealed class SettingsViewModel : ObservableObject
     {
         var s = config.Settings;
         DoubleCopyMs = s.DoubleCopyMs.ToString(CultureInfo.InvariantCulture);
-        SecondHotkey = s.SecondHotkey;
+        MainHotkey = s.MainHotkey;
         Model = s.Model;
         TimeoutSeconds = s.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
         PasteDelayMs = s.PasteDelayMs.ToString(CultureInfo.InvariantCulture);
@@ -228,7 +228,7 @@ public sealed class SettingsViewModel : ObservableObject
         var settings = new AppSettings
         {
             DoubleCopyMs = Number(DoubleCopyMs, "doubleCopyMs", "Zeitfenster"),
-            SecondHotkey = SecondHotkey.Trim(),
+            MainHotkey = MainHotkey.Trim(),
             Model = Model.Trim(),
             TimeoutSeconds = Number(TimeoutSeconds, "timeoutSeconds", "Timeout"),
             PasteDelayMs = Number(PasteDelayMs, "pasteDelayMs", "Wartezeit beim Einfügen"),

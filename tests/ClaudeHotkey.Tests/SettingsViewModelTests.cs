@@ -127,7 +127,7 @@ public class SettingsViewModelTests : IDisposable
         var before = File.ReadAllText(store.FilePath);
         vm.NewCommand.Execute(null);
         var broken = vm.Selected!;
-        broken.Hotkey = "ctrl+alt+space";
+        broken.Hotkey = "ctrl+c+c";
         vm.Selected = vm.Actions[0];
 
         Assert.False(vm.Save());
@@ -135,7 +135,7 @@ public class SettingsViewModelTests : IDisposable
         Assert.Equal(before, File.ReadAllText(store.FilePath));
         Assert.Same(broken, vm.Selected); // jumps to the action with errors
         Assert.NotNull(broken.Errors["prompt"]);
-        Assert.Contains("zweiten Hotkey", broken.Errors["hotkey"]);
+        Assert.Contains("Haupt-Hotkey", broken.Errors["hotkey"]);
         Assert.Null(vm.Actions[0].Errors["prompt"]);
         Assert.True(vm.StatusIsError);
     }
@@ -167,14 +167,24 @@ public class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Empty_second_hotkey_is_saved()
+    public void Main_hotkey_is_saved()
     {
         var (vm, store) = Create();
-        vm.SecondHotkey = "";
+        Assert.Equal("ctrl+c+c", vm.MainHotkey);
+        vm.MainHotkey = "ctrl+alt+space";
 
         Assert.True(vm.Save());
-        Assert.Equal("", store.Current.Settings.SecondHotkey);
-        Assert.Null(vm.GeneralErrors["secondHotkey"]);
+        Assert.Equal("ctrl+alt+space", store.Current.Settings.MainHotkey);
+    }
+
+    [Fact]
+    public void Empty_main_hotkey_is_an_error()
+    {
+        var (vm, _) = Create();
+        vm.MainHotkey = "";
+
+        Assert.False(vm.Save());
+        Assert.NotNull(vm.GeneralErrors["mainHotkey"]);
     }
 
     [Fact]

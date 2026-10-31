@@ -37,7 +37,8 @@ Deshalb den Schalter aus der veröffentlichten `.exe` heraus einschalten.
 
 ## Bedienung
 
-Text markieren, **Strg+C+C** oder **Strg+Alt+Leertaste** drücken. Das Popup öffnet sich an der Maus.
+Text markieren und den **Haupt-Hotkey** drücken, Standard **Strg+C+C** (einstellbar unter Einstellungen → Allgemein).
+Das Popup öffnet sich an der Maus.
 
 - Aktion per Klick oder mit den Tasten **1–9** starten. „Freitext“ fragt zuerst nach einer Anweisung (Enter führt aus).
 - Während Claude arbeitet, läuft ein Balken; **Esc** bricht ab (der CLI-Prozess wird beendet) und schließt.
@@ -61,11 +62,10 @@ Der Dialog schreibt dieselbe `actions.json`, die sich auch von Hand bearbeiten l
   Fokus hat, sind die globalen Hotkeys des Tools ausgesetzt, sonst käme eine schon belegte Kombination nie an. Der
   Hotkey kopiert den markierten Text, öffnet das Popup und führt die Aktion sofort aus.
 - **Doppeldruck** (z. B. Strg+X+X): im Hotkey-Feld dieselbe Kombination zweimal schnell drücken (600 ms). Gilt für
-  Aktions-Hotkeys und den zweiten Hotkey; das Zeitfenster beim Auslösen ist `doubleCopyMs`.
-- **Zweiter Hotkey** ist optional: Entf im Feld, speichern, dann ist keiner registriert.
+  Aktions-Hotkeys und den Haupt-Hotkey; das Zeitfenster beim Auslösen ist `doubleCopyMs`.
 - **Testen:** Beispieltext (und bei „Eingabefeld im Popup“ die Eingabe) eintragen; die Aktion läuft mit den noch nicht
   gespeicherten Werten, auch mit dem geänderten System-Prompt aus „Allgemein“.
-- **Allgemein:** Zeitfenster für Strg+C+C, zweiter Hotkey, Standardmodell, Timeout, Wartezeit beim Einfügen,
+- **Allgemein:** Haupt-Hotkey, Zeitfenster für Doppeldruck, Standardmodell, Timeout, Wartezeit beim Einfügen,
   Pfad zur CLI, System-Prompt, Autostart.
 - **Speichern** (oder Strg+S) prüft alles, schreibt atomar und wirkt sofort, auch für Hotkeys. Fehler stehen rot am
   Feld, Aktionen mit Fehlern haben einen roten Punkt in der Liste, und die Datei bleibt dann unverändert.
@@ -163,14 +163,19 @@ beim npm-Paket cross-spawn doppelt mit `^` maskiert (`ClaudeExecutable.BuildComm
 
 ## Textübernahme
 
-- **Strg+C+C:** Ein Low-Level-Tastaturhook (`Hotkeys/KeyboardHook.cs`) erkennt zweimal Strg+C innerhalb von
-  `doubleCopyMs` (Standard 400 ms). Tasten werden nie geschluckt, Kopieren funktioniert weiter normal. Gedrückt
-  gehaltenes C (Autorepeat), weitere Modifier (Strg+Umschalt+C, Strg+Alt+C) und von Programmen erzeugte
-  Tastendrücke zählen nicht; jede andere Taste dazwischen setzt die Erkennung zurück. Danach wartet das Tool bis zu
-  600 ms, bis das Programm fertig kopiert hat.
-- **Zweiter Hotkey** (Standard Strg+Alt+Leertaste, optional, auch als Doppeldruck): Das Tool wartet, bis die Hotkey-Tasten
+Ausgelöst wird über den **Haupt-Hotkey** (`mainHotkey`, Standard `ctrl+c+c`) oder den eigenen Hotkey einer Aktion.
+Wie der Text geholt wird, hängt von der Kombination ab:
+
+- **Strg+C+C und Strg+X+X:** Das Programm kopiert bzw. schneidet beim ersten Druck selbst. Ein Low-Level-Tastaturhook
+  (`Hotkeys/KeyboardHook.cs`) erkennt den zweiten Druck innerhalb von `doubleCopyMs` (Standard 400 ms). Tasten werden
+  nie geschluckt, Kopieren funktioniert weiter normal. Gedrückt gehaltene Tasten (Autorepeat), weitere Modifier
+  (Strg+Umschalt+C, Strg+Alt+C) und von Programmen erzeugte Tastendrücke zählen nicht; jede andere Taste dazwischen
+  setzt die Erkennung zurück. Danach wartet das Tool bis zu 600 ms, bis das Programm fertig kopiert hat.
+- **Jede andere Kombination** (z. B. Strg+Alt+Leertaste oder Strg+Alt+Q+Q): Das Tool wartet, bis die Hotkey-Tasten
   losgelassen sind (sonst käme Strg+Alt+C an), sichert die Zwischenablage, sendet Strg+C per `SendInput`, liest den
   Text und stellt die Zwischenablage wieder her. Ändert sich die Zwischenablage nicht, war nichts markiert.
+- Strg+C, Strg+X und Strg+V als **einfacher** Druck werden abgelehnt: `RegisterHotKey` nähme die Taste allen
+  anderen Programmen weg, Kopieren, Ausschneiden oder Einfügen ginge nicht mehr.
 - **Sichern und Wiederherstellen** (`Clipboard/ClipboardService.cs`): alle lesbaren Formate (Text, RTF, HTML,
   Bilder, Dateien). Formate, die sich nicht lesen lassen, werden übersprungen. Zugriffe werden bis zu zehnmal
   wiederholt, weil andere Programme die Zwischenablage kurz offen halten.
@@ -199,7 +204,7 @@ Fügt ein langsames Programm noch den alten Inhalt ein, `pasteDelayMs` in `actio
 
 ## Doppeldruck-Hotkeys
 
-In `actions.json` steht die Taste zweimal: `"hotkey": "ctrl+x+x"`, `"secondHotkey": "ctrl+alt+q+q"`.
+In `actions.json` steht die Taste zweimal: `"hotkey": "ctrl+x+x"`, `"mainHotkey": "ctrl+alt+q+q"`.
 `RegisterHotKey` kennt keinen Doppeldruck; diese Kombinationen erkennt deshalb derselbe Low-Level-Hook wie Strg+C+C
 (`Hotkeys/DoublePressDetector.cs`). Die Modifier müssen genau stimmen, gehaltene Tasten zählen nicht doppelt.
 
@@ -209,9 +214,9 @@ In `actions.json` steht die Taste zweimal: `"hotkey": "ctrl+x+x"`, `"secondHotke
   (wie bei Strg+C+C). „Ersetzen“ setzt das Ergebnis an der Stelle ein. Schließt man das Popup ohne Ersetzen, fehlt
   der Text im Dokument; Strg+Z oder Strg+V holt ihn zurück.
 - Bei allen anderen Tasten kopiert das Tool nach dem zweiten Druck selbst (Strg+C) und stellt die Zwischenablage
-  danach wieder her, wie beim zweiten Hotkey.
-- Vergeben sind: Strg+C+C (eingebaut) und damit auch Strg+C allein, das sonst das normale Kopieren abfangen würde.
-  Einfacher und doppelter Druck derselben Tasten (Strg+X und Strg+X+X) schließen sich gegenseitig aus.
+  danach wieder her.
+- Einfacher und doppelter Druck derselben Tasten (Strg+Alt+K und Strg+Alt+K+K) schließen sich gegenseitig aus. Der
+  Haupt-Hotkey ist für Aktionen gesperrt; wird er verlegt, ist Strg+C+C für eine Aktion frei.
 - Doppeldrucke können nicht „von einem anderen Programm belegt“ sein, weil nur der Hook des Tools sie sieht.
 
 ## Entscheidungen und Abweichungen vom Plan
@@ -245,8 +250,11 @@ In `actions.json` steht die Taste zweimal: `"hotkey": "ctrl+x+x"`, `"secondHotke
   denselben Pixeln rechnen.
 - **Zwischenablage bei Strg+C+C:** Hier bleibt der markierte Text in der Zwischenablage, wie bei DeepL. Der Nutzer
   hat selbst kopiert, und der Inhalt davor lässt sich nicht zuverlässig sichern: Das erste Strg+C hat ihn schon
-  überschrieben, bevor das Tool weiß, dass ein zweites folgt. Wiederhergestellt wird beim zweiten Hotkey und
-  (Phase 4) nach dem Ersetzen.
+  überschrieben, bevor das Tool weiß, dass ein zweites folgt. Wiederhergestellt wird bei Hotkeys, bei denen das
+  Tool selbst kopiert, und nach dem Ersetzen.
+- **Zweiter Hotkey entfernt:** Bis Phase 6 gab es neben dem festen Strg+C+C einen zweiten Hotkey (`secondHotkey`).
+  Stattdessen ist der Haupt-Hotkey (`mainHotkey`) einstellbar. Ein altes `secondHotkey` in `actions.json` wird
+  ignoriert und verschwindet beim nächsten Speichern.
 
 - **Solution-Format:** Das installierte SDK 10 erzeugt standardmäßig `.slnx`; angelegt ist bewusst eine klassische
   `ClaudeHotkey.sln`, Zielplattform aller Projekte `net8.0-windows`.
@@ -262,8 +270,9 @@ In `actions.json` steht die Taste zweimal: `"hotkey": "ctrl+x+x"`, `"secondHotke
 
 - Die Clipboard-Tests benutzen die echte Zwischenablage. Sie sichern den Inhalt vorher und stellen ihn danach wieder
   her; während `dotnet test` sollte man trotzdem nicht kopieren.
-- Fenster von Programmen mit Administratorrechten erreicht der zweite Hotkey nicht (kein `SendInput` dorthin),
-  solange das Tool selbst ohne Adminrechte läuft. Strg+C+C funktioniert dort, weil der Nutzer selbst kopiert.
+- Fenster von Programmen mit Administratorrechten erreichen Hotkeys nicht, bei denen das Tool selbst kopiert (kein
+  `SendInput` dorthin), solange das Tool ohne Adminrechte läuft. Strg+C+C funktioniert dort, weil der Nutzer selbst
+  kopiert; „Ersetzen“ dagegen nicht.
 
 - Jeder Aufruf startet einen eigenen Claude-Code-Prozess; einige Sekunden bis zur Antwort sind normal.
 - Bei einem Enterprise-Konto (`subscriptionType: enterprise`) laufen die Aufrufe über den Sitz der Organisation.

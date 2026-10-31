@@ -53,9 +53,35 @@ public class HotkeyGestureTests
     }
 
     [Fact]
-    public void Built_in_double_copy_is_ctrl_c_c()
+    public void Default_main_hotkey_is_ctrl_c_c()
     {
         Assert.Equal("ctrl+c+c", HotkeyGesture.DoubleCopy.ToString());
+    }
+
+    [Theory]
+    [InlineData("ctrl+c+c", true)]
+    [InlineData("ctrl+x+x", true)]
+    [InlineData("ctrl+shift+c+c", false)] // the app does not copy on Ctrl+Shift+C
+    [InlineData("ctrl+alt+space", false)]
+    [InlineData("ctrl+q+q", false)]
+    public void Knows_when_the_app_copies_itself(string text, bool expected)
+    {
+        HotkeyGesture.TryParse(text, out var gesture);
+
+        Assert.Equal(expected, gesture!.AppCopiesItself);
+    }
+
+    [Theory]
+    [InlineData("ctrl+c", true)]
+    [InlineData("ctrl+x", true)]
+    [InlineData("ctrl+v", true)]
+    [InlineData("ctrl+c+c", false)]
+    [InlineData("ctrl+alt+c", false)]
+    public void Knows_which_single_hotkeys_would_block_the_clipboard(string text, bool expected)
+    {
+        HotkeyGesture.TryParse(text, out var gesture);
+
+        Assert.Equal(expected, gesture!.BlocksClipboardKeys);
     }
 
     [Theory]
