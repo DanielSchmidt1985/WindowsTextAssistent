@@ -4,7 +4,36 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Phase 5 (Einstellungsdialog)**. Tray, Autostart und Logdatei (Phase 6) folgen. Bis zum Tray-Icon zeigt die App ein vorläufiges Statusfenster; Schließen beendet das Tool.
+Stand: **Phase 6 (Tray, Autostart, Feinschliff)**. Die Auslieferung als einzelne `.exe` (Phase 7) folgt.
+
+## Tray
+
+Das Tool läuft ohne Fenster im Infobereich der Taskleiste. Windows 11 legt neue Icons zuerst in den Überlauf (^);
+dauerhaft sichtbar wird es über *Einstellungen → Personalisierung → Taskleiste → Andere Symbole der Taskleiste*.
+
+- **Tooltip und erste Menüzeile** zeigen den Zustand: „Abo aktiv“ oder die Warnung des Preflights, eine fehlerhafte
+  `actions.json` und von anderen Programmen belegte Hotkeys. Bei einer Warnung bekommt das Icon einen roten Punkt.
+- **Menü (Rechtsklick):** Einstellungen, Logdatei öffnen, Beenden. **Doppelklick** öffnet die Einstellungen.
+- **Benachrichtigungen** erscheinen bei belegten Hotkeys, fehlerhafter `actions.json` oder `theme.json` und wenn
+  Claude nicht erreichbar ist oder einen API-Key benutzt.
+- **Nur eine Instanz:** Ein zweiter Start öffnet die Einstellungen der laufenden Instanz und beendet sich.
+  `ClaudeHotkey.exe --exit` beendet eine laufende Instanz (z. B. vor einem Update der `.exe`).
+
+## Logdatei
+
+`%APPDATA%\ClaudeHotkey\log.txt`, ab 1 MB rotiert nach `log.1.txt`. Eine Zeile je Ereignis mit Zeitpunkt, Ereignis,
+Aktions-Kennung, Dauer und Code, z. B. `claude  action=improve  ms=6012  code=None`. `AppLog.Write` hat keinen
+Parameter für freien Text, und alle Werte werden auf Buchstaben, Ziffern und `-_.+` gekürzt; markierter Text oder
+Claudes Antwort können so nicht hineingeraten. Ereignisse: `start`, `preflight`, `capture`, `claude`, `replace`,
+`settings`, `autostart`, `config`, `hotkey`, `exit`.
+
+## Autostart
+
+„Mit Windows starten“ in den Einstellungen trägt beim **Speichern** `"<Pfad zur exe>"` unter
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` als `ClaudeHotkey` ein bzw. entfernt den Eintrag. Nur dieser
+eine Wert wird angefasst, Adminrechte sind nicht nötig. Der Eintrag wird bewusst nur beim Speichern geschrieben,
+nicht bei jedem Start: Sonst würde ein Test-Build aus `bin\Debug` den Eintrag der installierten Kopie umbiegen.
+Deshalb den Schalter aus der veröffentlichten `.exe` heraus einschalten.
 
 ## Bedienung
 
@@ -20,7 +49,7 @@ Text markieren, **Strg+C+C** oder **Strg+Alt+Leertaste** drücken. Das Popup öf
 
 ## Einstellungsdialog
 
-Öffnen über das Zahnrad im Popup oder „Einstellungen …“ im Statusfenster (ab Phase 6 über das Tray-Menü).
+Öffnen über das Tray-Menü, einen Doppelklick aufs Tray-Icon oder das Zahnrad im Popup.
 Der Dialog schreibt dieselbe `actions.json`, die sich auch von Hand bearbeiten lässt.
 
 - **Aktionen:** Liste links, per Drag-and-drop oder mit ↑/↓ sortierbar; die Reihenfolge ist die der Popup-Buttons.
@@ -51,7 +80,7 @@ gelten ohne Neustart.
 - Erlaubt sind Kommentare (`//`) und Kommas am Ende.
 - Geprüft wird: eindeutige `id`, nicht leerer `prompt`, `askInput` nur mit `{input}` im Prompt, gültige und nicht
   doppelt vergebene Hotkeys, Wertebereiche für `doubleCopyMs` (100–2000) und `timeoutSeconds` (5–600).
-- Ist die Datei fehlerhaft, bleibt die zuletzt gültige Konfiguration aktiv; die Fehler stehen im Statusfenster.
+- Ist die Datei fehlerhaft, bleibt die zuletzt gültige Konfiguration aktiv; das Tray meldet die Fehler.
 - Zusätzlich zum Plan: `settings.autostart`, `settings.claudePath` und pro Aktion `hotkey` und `enabled`
   (für den Einstellungsdialog). `enabled: false` blendet eine Aktion im Popup aus.
 
@@ -175,7 +204,14 @@ Fügt ein langsames Programm noch den alten Inhalt ein, `pasteDelayMs` in `actio
   Schalter, ListBox, ScrollBar, TabControl, ToolTip, ContextMenu), dazu ProgressBar, MenuItem und Separator.
   Ausnahme: Die Rückfrage beim Schließen mit ungespeicherten Änderungen ist eine Windows-MessageBox und deshalb hell.
 - **Eigene Hotkeys pro Aktion** sind in Phase 5 umgesetzt, nicht erst als spätere Erweiterung.
-- **Autostart:** Der Schalter wird in Phase 5 nur gespeichert; den Registry-Eintrag setzt das Tool ab Phase 6.
+- **Autostart** wird nur beim Speichern angewendet, nicht bei jedem Start (siehe „Autostart“).
+- **H.NotifyIcon.Wpf 2.3.2** statt der neuesten 2.4.1: 2.4.1 enthält nur Builds für `net10.0-windows` und `net462`,
+  für `net8.0-windows` würde der .NET-Framework-Build genommen. 2.3.2 hat einen eigenen .NET-8-Build.
+- **Kein Effizienzmodus:** `TaskbarIcon.ForceCreate(false)`. Mit dem Standardwert `true` drosselt Windows den Prozess,
+  und ein gedrosselter Low-Level-Tastaturhook antwortet zu langsam und wird von Windows entfernt.
+- **`--exit`:** zusätzlicher Startparameter, nicht im Plan, für Updates und Skripte.
+- **Statusfenster entfernt:** Es diente seit Phase 2 als Ersatz fürs Tray. Was es zeigte, steht jetzt im Tray-Tooltip,
+  in Benachrichtigungen und in der Logdatei.
 - **Speichern schließt nicht:** Der Dialog bleibt offen, damit sich Prompts nacheinander abstimmen lassen.
 - **Auslöser in eigenen Fenstern** (Popup, Einstellungen) werden ignoriert, damit Kopieren dort kein neues Popup öffnet.
 - **Modellauswahl:** Vorgeschlagen werden die Aliasse `haiku`, `sonnet`, `opus` und `fable` (laut `claude --help`);

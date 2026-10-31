@@ -208,7 +208,7 @@
 
                     <CheckBox Content="Mit Windows starten" IsChecked="{Binding Autostart}" Margin="0,16,0,0" />
                     <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="40,4,0,0" TextWrapping="Wrap"
-                               Text="Wird mit dem Tray-Icon (Phase 6) wirksam; bis dahin nur gespeichert." />
+                               Text="Beim Speichern wird dieses Programm unter HKCU\…\Run eingetragen bzw. wieder entfernt. Am besten aus der veröffentlichten .exe einschalten, nicht aus einem Test-Build." />
                   </StackPanel>
                 </ScrollViewer>
             </TabItem>

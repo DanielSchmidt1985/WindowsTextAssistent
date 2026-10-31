@@ -1,10 +1,13 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using ClaudeHotkey.Core.Claude;
 using ClaudeHotkey.Core.Clipboard;
 using ClaudeHotkey.Core.Config;
 using ClaudeHotkey.Core.Hotkeys;
 using ClaudeHotkey.Core.Input;
+using ClaudeHotkey.Core.Logging;
+using ClaudeHotkey.Core.Startup;
 using ClaudeHotkey.Core.Windows;
 using ClaudeHotkey.Themes;
 using ClaudeHotkey.ViewModels;
@@ -16,13 +19,22 @@ public partial class App : Application
 {
     private readonly ClipboardService _clipboard = new();
     private readonly ActionConfigStore _config = new(ActionConfigStore.DefaultDirectory, DefaultConfig.Json);
+    private readonly AppLog _log = new(Path.Combine(ActionConfigStore.DefaultDirectory, AppLog.FileName));
+    private SingleInstance? _instance;
+    private TrayIcon? _tray;
     private KeyboardHook? _hook;
     private GlobalHotkeys? _hotkeys;
     private TextCapture? _capture;
-    private CaptureLogWindow? _log;
     private PopupWindow? _popup;
     private SettingsWindow? _settings;
     private bool _capturing;
+
+    // Pieces of the tray status; see UpdateTrayStatus.
+    private string _claudeStatus = "Claude wird geprüft …";
+    private bool _claudeWarning;
+    private string _hotkeyStatus = "";
+    private bool _hotkeyWarning;
+    private bool _configWarning;
 
     /// <summary>Registered gestures: null for the second hotkey, otherwise the id of the action it runs.</summary>
     private readonly Dictionary<HotkeyGesture, string?> _hotkeyTargets = [];
@@ -33,45 +45,82 @@ public partial class App : Application
 
         if (e.Args is ["--demo", var demoState, ..])
         {
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
             ShowDemo(demoState);
             return;
         }
 
-        // Until the tray icon (phase 6) exists, this window shows status; closing it ends the tool.
-        _log = new CaptureLogWindow();
-        _log.SettingsRequested += (_, _) => OpenSettings();
-        MainWindow = _log;
-        _log.Show();
+        // A second start opens the settings of the running instance instead; "--exit" quits it.
+        var exitRequested = e.Args.Contains("--exit");
+        _instance = SingleInstance.Acquire(
+            () => Dispatcher.BeginInvoke(OpenSettings),
+            () => Dispatcher.BeginInvoke(() => Shutdown()),
+            exitRequested ? SingleInstance.Request.Exit : SingleInstance.Request.Activate);
+        if (!_instance.IsFirst || exitRequested)
+        {
+            Shutdown();
+            return;
+        }
+        _log.Write("start");
 
-        foreach (var problem in ThemeOverrides.Apply(Resources, _config.Directory))
-            _log.Add(new CaptureLogWindow.Entry("Theme", problem, ""));
+        _tray = new TrayIcon();
+        _tray.SettingsRequested += (_, _) => OpenSettings();
+        _tray.OpenLogRequested += (_, _) => OpenLogFile();
+        _tray.ExitRequested += (_, _) => Shutdown();
+
+        var themeProblems = ThemeOverrides.Apply(Resources, _config.Directory);
+        if (themeProblems.Count > 0)
+            _tray.Notify("theme.json fehlerhaft", string.Join(Environment.NewLine, themeProblems), warning: true);
 
         ReloadConfig();
         var settings = _config.Current.Settings;
         _capture = new TextCapture(new SystemClipboard(_clipboard), new KeyboardInput());
 
         _hook = new KeyboardHook(settings.DoubleCopyMs);
-        _hook.DoubleCopy += (_, args) => Capture("Strg+C+C", () => _capture.AfterUserCopyAsync(args.ClipboardSequence), null);
+        _hook.DoubleCopy += (_, args) => Capture("double-copy", () => _capture.AfterUserCopyAsync(args.ClipboardSequence), null);
 
         _hotkeys = new GlobalHotkeys();
         _hotkeys.Pressed += (_, gesture) =>
         {
             if (_hotkeyTargets.TryGetValue(gesture, out var actionId))
-                Capture(gesture.ToString(), () => _capture.BySendingCopyAsync(gesture.VirtualKey), actionId);
+                Capture(actionId is null ? "second-hotkey" : "action-hotkey", () => _capture.BySendingCopyAsync(gesture.VirtualKey), actionId);
         };
-        RegisterHotkeys();
+        RegisterHotkeys(notifyWhenTaken: true);
 
         // While a hotkey field in the settings has focus, the combination must reach the field.
         HotkeyTextBox.CaptureStarted += (_, _) => _hotkeys.UnregisterAll();
-        HotkeyTextBox.CaptureEnded += (_, _) => RegisterHotkeys();
+        HotkeyTextBox.CaptureEnded += (_, _) => RegisterHotkeys(notifyWhenTaken: false);
 
+        UpdateTrayStatus();
         _ = RunPreflightAsync(settings);
     }
 
-    /// <summary>(Re)registers the second hotkey and the hotkeys of all active actions from the current config.</summary>
-    private void RegisterHotkeys()
+    private async Task RunPreflightAsync(AppSettings settings)
     {
-        if (_hotkeys is null || _log is null)
+        var preflight = await new ClaudeCli(settings.ClaudePath).PreflightAsync(settings.Model);
+        _log.Write("preflight", code: preflight.Success ? (preflight.UsesSubscription ? "Subscription" : "ApiKey") : preflight.Error.ToString());
+        _claudeStatus = preflight.Message;
+        _claudeWarning = !preflight.Success || !preflight.UsesSubscription;
+        UpdateTrayStatus();
+        if (_claudeWarning)
+            _tray?.Notify("Claude", preflight.Message, warning: true);
+    }
+
+    /// <summary>Tooltip and menu header: Claude state first, then hotkeys; red dot on any warning.</summary>
+    private void UpdateTrayStatus()
+    {
+        var parts = new List<string> { _claudeStatus };
+        if (_configWarning)
+            parts.Add("actions.json fehlerhaft");
+        if (_hotkeyStatus.Length > 0)
+            parts.Add(_hotkeyStatus);
+        _tray?.SetStatus(string.Join(" · ", parts), _claudeWarning || _hotkeyWarning || _configWarning);
+    }
+
+    /// <summary>(Re)registers the second hotkey and the hotkeys of all active actions from the current config.</summary>
+    private void RegisterHotkeys(bool notifyWhenTaken)
+    {
+        if (_hotkeys is null)
             return;
         _hotkeys.UnregisterAll();
         _hotkeyTargets.Clear();
@@ -82,35 +131,55 @@ public partial class App : Application
             .Where(a => !string.IsNullOrWhiteSpace(a.Hotkey))
             .Select(a => (a.Hotkey!, (string?)a.Id, $"„{a.Label}“")));
 
-        var active = new List<string>();
         var taken = new List<string>();
         foreach (var (text, actionId, name) in wanted)
         {
             if (!HotkeyGesture.TryParse(text, out var gesture))
                 continue; // validation already rejected it; nothing to register
             if (_hotkeys.TryRegister(gesture))
-            {
                 _hotkeyTargets[gesture] = actionId;
-                active.Add($"{gesture} ({name})");
-            }
             else
-            {
                 taken.Add($"{gesture} ({name})");
-            }
         }
 
-        var status = $"Strg+C+C ({config.Settings.DoubleCopyMs} ms) aktiv. Hotkeys: {(active.Count > 0 ? string.Join(", ", active) : "keine")}.";
-        if (taken.Count > 0)
-            status += $" Von einem anderen Programm belegt: {string.Join(", ", taken)}.";
-        _log.SetHotkeyStatus(status);
+        _hotkeyWarning = taken.Count > 0;
+        _hotkeyStatus = _hotkeyWarning ? $"belegt: {string.Join(", ", taken)}" : "";
+        UpdateTrayStatus();
+        if (_hotkeyWarning && notifyWhenTaken)
+        {
+            _log.Write("hotkey", code: "Taken");
+            _tray?.Notify("Hotkey belegt",
+                $"Von einem anderen Programm belegt: {string.Join(", ", taken)}. In den Einstellungen eine andere Kombination wählen.",
+                warning: true);
+        }
     }
 
     /// <summary>Puts a newly saved or reloaded configuration into effect without a restart.</summary>
-    private void ApplyConfig()
+    private void ApplyConfig(bool notify)
     {
         if (_hook is not null)
             _hook.DoubleCopyMilliseconds = _config.Current.Settings.DoubleCopyMs;
-        RegisterHotkeys();
+        RegisterHotkeys(notify);
+    }
+
+    /// <summary>Reads actions.json again if it changed; a broken file keeps the last valid one.</summary>
+    private void ReloadConfig()
+    {
+        var before = _config.Current;
+        var ok = _config.Reload();
+        if (!ReferenceEquals(before, _config.Current) && _hotkeys is not null)
+            ApplyConfig(notify: true); // edited by hand: hotkeys and timing follow without a restart
+
+        var wasBroken = _configWarning;
+        _configWarning = !ok;
+        UpdateTrayStatus();
+        if (!ok && !wasBroken)
+        {
+            _log.Write("config", code: "Invalid");
+            _tray?.Notify("actions.json fehlerhaft",
+                $"Die letzte gültige Konfiguration bleibt aktiv.{Environment.NewLine}{string.Join(Environment.NewLine, _config.LoadErrors.Take(3))}",
+                warning: true);
+        }
     }
 
     private void OpenSettings()
@@ -122,38 +191,49 @@ public partial class App : Application
         }
         var viewModel = new SettingsViewModel(_config,
             (request, token) => new ClaudeCli(_config.Current.Settings.ClaudePath).RunAsync(request, token));
-        viewModel.Saved += (_, _) => ApplyConfig();
+        viewModel.Saved += (_, config) =>
+        {
+            _log.Write("settings", code: "Saved");
+            ApplyAutostart(config.Settings.Autostart);
+            ApplyConfig(notify: true);
+            ReloadConfig(); // clears a "fehlerhaft" state: the file is valid again
+        };
         _settings = new SettingsWindow(viewModel);
         _settings.Closed += (_, _) => _settings = null;
         _settings.Show();
         _settings.Activate();
     }
 
-    private async Task RunPreflightAsync(AppSettings settings)
+    /// <summary>
+    /// Only on "Speichern", not at every start: a test build started from bin\Debug must not
+    /// redirect the autostart entry of the installed copy.
+    /// </summary>
+    private void ApplyAutostart(bool enabled)
     {
-        var preflight = await new ClaudeCli(settings.ClaudePath).PreflightAsync(settings.Model);
-        _log?.SetPreflight($"Claude: {preflight.Message}");
+        if (Environment.ProcessPath is not { } exe)
+            return;
+        try
+        {
+            if (new Autostart(new CurrentUserRunKey()).Apply(enabled, exe))
+                _log.Write("autostart", code: enabled ? "On" : "Off");
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            _tray?.Notify("Autostart", $"Der Autostart ließ sich nicht ändern: {ex.Message}", warning: true);
+        }
     }
 
-    /// <summary>Reads actions.json again if it changed; a broken file keeps the last valid one.</summary>
-    private void ReloadConfig()
+    private void OpenLogFile()
     {
-        var before = _config.Current;
-        var ok = _config.Reload();
-        if (!ReferenceEquals(before, _config.Current) && _hotkeys is not null)
-            ApplyConfig(); // edited by hand: hotkeys and timing follow without a restart
-        if (ok)
-            return;
-        _log?.Add(new CaptureLogWindow.Entry(
-            "actions.json fehlerhaft, die letzte gültige Konfiguration bleibt aktiv",
-            string.Join(Environment.NewLine, _config.LoadErrors),
-            _config.FilePath));
+        if (!File.Exists(_log.FilePath))
+            _log.Write("log", code: "Opened");
+        Process.Start(new ProcessStartInfo(_log.FilePath) { UseShellExecute = true });
     }
 
     /// <param name="actionId">Set for an action's own hotkey: the popup runs that action right away.</param>
     private async void Capture(string trigger, Func<Task<CaptureResult>> capture, string? actionId)
     {
-        if (_capturing || _log is null)
+        if (_capturing)
             return;
         var source = ForegroundWindow.Current; // "Ersetzen" pastes back into this window
         if (ForegroundWindow.BelongsToThisProcess(source))
@@ -163,17 +243,13 @@ public partial class App : Application
         {
             var anchor = ForegroundWindow.CursorPosition();
             var result = await capture();
+            _log.Write("capture", actionId ?? trigger, code: result.Success ? "Ok" : "NoText");
             ReloadConfig();
-
-            _log.Add(new CaptureLogWindow.Entry(
-                $"{DateTime.Now:HH:mm:ss}  {trigger}  {(result.Success ? "✓" : "✗")}",
-                result.Text is { } text ? $"{text.Length} Zeichen" : result.Message ?? "",
-                ""));
             ShowPopup(result, anchor, source, actionId);
         }
         catch (Exception ex)
         {
-            _log.Add(new CaptureLogWindow.Entry($"{DateTime.Now:HH:mm:ss}  {trigger}  Fehler", ex.Message, ""));
+            _log.Write("capture", actionId ?? trigger, code: ex.GetType().Name);
         }
         finally
         {
@@ -193,6 +269,7 @@ public partial class App : Application
             config,
             (request, token) => cli.RunAsync(request, token),
             text => _clipboard.SetText(text));
+        viewModel.RunCompleted += (_, run) => _log.Write("claude", run.ActionId, run.Duration, run.Error.ToString());
 
         var popup = new PopupWindow(viewModel, anchor);
         var closed = false;
@@ -203,6 +280,7 @@ public partial class App : Application
             popup.Hide();
             var replacer = new TextReplacer(new SystemClipboard(_clipboard), new KeyboardInput(), new SystemWindowActivator());
             var result = await replacer.ReplaceAsync(source, text, TimeSpan.FromMilliseconds(config.Settings.PasteDelayMs));
+            _log.Write("replace", viewModel.CurrentAction?.Definition.Id, code: result.Success ? "Ok" : ReplaceCode(result.Message));
             if (closed)
                 return; // replaced by a newer popup meanwhile
             if (result.Success)
@@ -219,6 +297,14 @@ public partial class App : Application
         _popup = popup;
         popup.Show();
     }
+
+    private static string ReplaceCode(string? message) => message switch
+    {
+        TextReplacer.WindowGoneMessage => "WindowGone",
+        TextReplacer.ActivateFailedMessage => "ActivateFailed",
+        TextReplacer.KeysHeldMessage => "KeysHeld",
+        _ => "Failed",
+    };
 
     /// <summary>
     /// Opens the popup in one state with sample text and a simulated Claude answer, without hooks
@@ -311,6 +397,10 @@ public partial class App : Application
         _settings?.Close();
         _hook?.Dispose();
         _hotkeys?.Dispose();
+        _tray?.Dispose();
+        if (_instance?.IsFirst == true)
+            _log.Write("exit");
+        _instance?.Dispose();
         base.OnExit(e);
     }
 }

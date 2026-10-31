@@ -77,6 +77,9 @@ public sealed class PopupViewModel : ObservableObject
     /// <summary>Asks the window to focus the input field.</summary>
     public event EventHandler? InputRequested;
 
+    /// <summary>After each Claude call: action id, duration and outcome, for the log file.</summary>
+    public event EventHandler<(string ActionId, TimeSpan Duration, ClaudeErrorKind Error)>? RunCompleted;
+
     /// <summary>"Ersetzen" was chosen; the argument is the text to paste into the source window.</summary>
     public event EventHandler<string>? ReplaceRequested;
 
@@ -247,6 +250,7 @@ public sealed class PopupViewModel : ObservableObject
             TimeSpan.FromSeconds(_settings.TimeoutSeconds));
 
         ClaudeResult result;
+        var started = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             result = await _run(request, running.Token);
@@ -259,6 +263,7 @@ public sealed class PopupViewModel : ObservableObject
         {
             _running = null;
         }
+        RunCompleted?.Invoke(this, (definition.Id, started.Elapsed, result.Error));
 
         if (result.Success)
         {

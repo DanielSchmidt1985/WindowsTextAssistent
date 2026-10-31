@@ -4,6 +4,10 @@
     <ProjectReference Include="..\ClaudeHotkey.Core\ClaudeHotkey.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.2" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -11,6 +15,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\*.ico" />
+  </ItemGroup>
 
 </Project>
