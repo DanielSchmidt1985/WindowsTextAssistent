@@ -194,19 +194,29 @@
                     <Border x:Name="Track" Background="{DynamicResource BorderBrush}" ClipToBounds="True">
                         <Rectangle x:Name="Indicator" Width="80" HorizontalAlignment="Left" Fill="{DynamicResource AccentBrush}">
                             <Rectangle.RenderTransform>
-                                <TranslateTransform x:Name="Move" X="-80" />
+                                <TranslateTransform X="-80" />
                             </Rectangle.RenderTransform>
                         </Rectangle>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetName="Move" Storyboard.TargetProperty="X"
-                                                     From="-80" To="600" Duration="0:0:1.2" />
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
+                        <!-- Start on IsVisible, not on Loaded: a collapsed bar gets Loaded when the window
+                             opens, but its template is only applied once it becomes visible. A Loaded
+                             storyboard then finds no "Indicator" and the unhandled exception ends the app.
+                             IsVisible also stops the animation while the bar is hidden. -->
+                        <Trigger Property="IsVisible" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="Sweep">
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="Indicator"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                         From="-80" To="600" Duration="0:0:1.2" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="Sweep" />
+                            </Trigger.ExitActions>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

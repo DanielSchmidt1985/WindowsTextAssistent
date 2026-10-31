@@ -155,13 +155,17 @@ public partial class App : Application
         var area = SystemParameters.WorkArea;
         var popup = new PopupWindow(viewModel, ((int)(area.Width / 2 - 240), (int)(area.Height / 2 - 200)));
         MainWindow = popup;
-        popup.Show();
-
-        switch (state)
+        // Start the action only after the popup is on screen, as in real use. Starting it before
+        // Loaded hid the busy-bar crash: the bar was visible from the start there.
+        popup.ContentRendered += (_, _) =>
         {
-            case "input": viewModel.TryRunShortcut("8"); break;
-            case "running" or "result" or "error": viewModel.TryRunShortcut("2"); break;
-        }
+            switch (state)
+            {
+                case "input": viewModel.TryRunShortcut("8"); break;
+                case "running" or "result" or "error": viewModel.TryRunShortcut("2"); break;
+            }
+        };
+        popup.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
