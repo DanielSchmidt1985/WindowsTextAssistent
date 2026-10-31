@@ -11,6 +11,9 @@ public sealed class AppSettings
     public string SecondHotkey { get; set; } = "ctrl+alt+space";
     public string Model { get; set; } = "haiku";
     public int TimeoutSeconds { get; set; } = 60;
+
+    /// <summary>Wait after Ctrl+V before the old clipboard content is put back.</summary>
+    public int PasteDelayMs { get; set; } = 500;
     public string SystemPrompt { get; set; } = "";
     public bool Autostart { get; set; }
 
@@ -98,6 +101,8 @@ public sealed class ActionConfig
             errors.Add("doubleCopyMs muss zwischen 100 und 2000 liegen.");
         if (Settings.TimeoutSeconds is < 5 or > 600)
             errors.Add("timeoutSeconds muss zwischen 5 und 600 liegen.");
+        if (Settings.PasteDelayMs is < 100 or > 5000)
+            errors.Add("pasteDelayMs muss zwischen 100 und 5000 liegen.");
         if (string.IsNullOrWhiteSpace(Settings.Model))
             errors.Add("model darf nicht leer sein.");
         if (!HotkeyGesture.TryParse(Settings.SecondHotkey, out var secondHotkey))

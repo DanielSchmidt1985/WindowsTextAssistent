@@ -185,7 +185,7 @@ public class TextCaptureTests
         Assert.False(result.Success);
     }
 
-    private sealed class FakeClipboard : IClipboard
+    internal sealed class FakeClipboard : IClipboard
     {
         public string? Text { get; set; }
         public uint SequenceNumber { get; private set; } = 1;
@@ -198,6 +198,8 @@ public class TextCaptureTests
         }
 
         public string? GetText() => Text;
+
+        public void SetText(string text) => SimulateCopy(text);
 
         public ClipboardSnapshot Backup() =>
             new(Text is null ? [] : [new KeyValuePair<string, object>(DataFormats.UnicodeText, Text)]);
@@ -212,7 +214,7 @@ public class TextCaptureTests
         public Task<bool> WaitForChangeAsync(uint sequence, TimeSpan timeout) => Task.FromResult(SequenceNumber != sequence);
     }
 
-    private sealed class FakeKeyboard(Action onCtrlC) : IKeyboardInput
+    internal sealed class FakeKeyboard(Action onCtrlC) : IKeyboardInput
     {
         public List<int> Sent { get; } = [];
         public int? WaitedForKey { get; private set; }

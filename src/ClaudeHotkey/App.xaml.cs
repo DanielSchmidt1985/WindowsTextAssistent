@@ -82,7 +82,7 @@ public partial class App : Application
         try
         {
             var anchor = ForegroundWindow.CursorPosition();
-            var source = ForegroundWindow.Current; // needed for "Ersetzen" in phase 4
+            var source = ForegroundWindow.Current; // "Ersetzen" pastes back into this window
             var result = await capture();
             ReloadConfig();
             if (_hook is not null)
@@ -92,7 +92,7 @@ public partial class App : Application
                 $"{DateTime.Now:HH:mm:ss}  {trigger}  {(result.Success ? "✓" : "✗")}",
                 result.Text is { } text ? $"{text.Length} Zeichen" : result.Message ?? "",
                 ""));
-            ShowPopup(result, anchor);
+            ShowPopup(result, anchor, source);
         }
         catch (Exception ex)
         {
@@ -104,7 +104,7 @@ public partial class App : Application
         }
     }
 
-    private void ShowPopup(CaptureResult capture, (int X, int Y) anchor)
+    private void ShowPopup(CaptureResult capture, (int X, int Y) anchor, IntPtr source)
     {
         _popup?.Close(); // a new trigger replaces the open popup and cancels its call
 
@@ -118,14 +118,31 @@ public partial class App : Application
             text => _clipboard.SetText(text));
 
         var popup = new PopupWindow(viewModel, anchor);
-        popup.Closed += (_, _) => { if (_popup == popup) _popup = null; };
+        var closed = false;
+        popup.Closed += (_, _) => { closed = true; if (_popup == popup) _popup = null; };
+        viewModel.ReplaceRequested += async (_, text) =>
+        {
+            // Out of the way first, so the source window can take the focus back.
+            popup.Hide();
+            var replacer = new TextReplacer(new SystemClipboard(_clipboard), new KeyboardInput(), new SystemWindowActivator());
+            var result = await replacer.ReplaceAsync(source, text, TimeSpan.FromMilliseconds(config.Settings.PasteDelayMs));
+            if (closed)
+                return; // replaced by a newer popup meanwhile
+            if (result.Success)
+            {
+                popup.Close();
+                return;
+            }
+            viewModel.ReplaceError = result.Message;
+            popup.Show();
+        };
         _popup = popup;
         popup.Show();
     }
 
     /// <summary>
     /// Opens the popup in one state with sample text and a simulated Claude answer, without hooks
-    /// or CLI calls: <c>ClaudeHotkey.exe --demo choose|input|running|result|error|nocapture</c>.
+    /// or CLI calls: <c>ClaudeHotkey.exe --demo choose|input|running|result|error|nocapture|replacefail</c>.
     /// For checking the design against the reference screenshot.
     /// </summary>
     private void ShowDemo(string state)
@@ -163,6 +180,10 @@ public partial class App : Application
             {
                 case "input": viewModel.TryRunShortcut("8"); break;
                 case "running" or "result" or "error": viewModel.TryRunShortcut("2"); break;
+                case "replacefail":
+                    viewModel.TryRunShortcut("2");
+                    viewModel.ReplaceError = TextReplacer.ActivateFailedMessage;
+                    break;
             }
         };
         popup.Show();

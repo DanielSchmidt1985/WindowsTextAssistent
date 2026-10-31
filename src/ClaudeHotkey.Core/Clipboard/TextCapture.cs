@@ -14,6 +14,7 @@ public interface IClipboard
 {
     uint SequenceNumber { get; }
     string? GetText();
+    void SetText(string text);
     ClipboardSnapshot Backup();
     void Restore(ClipboardSnapshot snapshot);
     Task<bool> WaitForChangeAsync(uint sequence, TimeSpan timeout);
@@ -23,6 +24,7 @@ public sealed class SystemClipboard(ClipboardService service) : IClipboard
 {
     public uint SequenceNumber => ClipboardService.SequenceNumber;
     public string? GetText() => service.GetText();
+    public void SetText(string text) => service.SetText(text);
     public ClipboardSnapshot Backup() => service.Backup();
     public void Restore(ClipboardSnapshot snapshot) => service.Restore(snapshot);
     public Task<bool> WaitForChangeAsync(uint sequence, TimeSpan timeout) => ClipboardService.WaitForChangeAsync(sequence, timeout);

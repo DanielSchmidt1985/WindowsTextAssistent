@@ -37,6 +37,22 @@ public static class ForegroundWindow
         }
     }
 
+    /// <summary>False when the window has been closed in the meantime.</summary>
+    public static bool Exists(IntPtr hwnd) => hwnd != IntPtr.Zero && IsWindow(hwnd);
+
+    /// <summary>Waits until <paramref name="hwnd"/> is the foreground window. False on timeout.</summary>
+    public static async Task<bool> WaitUntilForegroundAsync(IntPtr hwnd, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (GetForegroundWindow() != hwnd)
+        {
+            if (DateTime.UtcNow >= deadline)
+                return false;
+            await Task.Delay(15).ConfigureAwait(true);
+        }
+        return true;
+    }
+
     public static (int X, int Y) CursorPosition()
     {
         GetCursorPos(out var point);
@@ -100,6 +116,7 @@ public static class ForegroundWindow
     }
 
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool BringWindowToTop(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);

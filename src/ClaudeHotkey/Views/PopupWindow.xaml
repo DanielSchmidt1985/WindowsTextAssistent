@@ -79,14 +79,17 @@
                          Visibility="{Binding ShowDetails, Converter={StaticResource BoolToVisibility}}" />
             </StackPanel>
 
+            <TextBlock Text="{Binding ReplaceError}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Visibility="{Binding HasReplaceError, Converter={StaticResource BoolToVisibility}}" />
+
             <!-- Footer -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                 <Button Content="Erneut versuchen" Margin="0,0,4,0" Command="{Binding RetryCommand}"
                         Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}" />
                 <Button Content="Kopieren" Margin="0,0,4,0" Command="{Binding CopyCommand}"
                         Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
-                <Button Style="{StaticResource PrimaryButton}" Content="Ersetzen" IsEnabled="False"
-                        ToolTip="Ersetzen folgt in Phase 4" ToolTipService.ShowOnDisabled="True"
+                <Button x:Name="ReplaceButton" Style="{StaticResource PrimaryButton}" Content="Ersetzen" IsDefault="True"
+                        ToolTip="Markierten Text im Quellfenster ersetzen (Enter)" Command="{Binding ReplaceCommand}"
                         Visibility="{Binding CanReplace, Converter={StaticResource BoolToVisibility}}" />
             </StackPanel>
         </StackPanel>

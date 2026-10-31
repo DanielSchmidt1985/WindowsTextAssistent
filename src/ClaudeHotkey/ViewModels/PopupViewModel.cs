@@ -56,6 +56,11 @@ public sealed class PopupViewModel : ObservableObject
         SubmitInputCommand = new RelayCommand(() => { if (_current is { } item) _ = RunAsync(item, InputText); },
                                               () => IsAskingInput && InputText.Trim().Length > 0);
         CopyCommand = new RelayCommand(() => { _copy(ResultText); CloseRequested?.Invoke(this, EventArgs.Empty); }, () => HasResult);
+        ReplaceCommand = new RelayCommand(() =>
+        {
+            ReplaceError = null;
+            ReplaceRequested?.Invoke(this, ResultText);
+        }, () => CanReplace);
         RetryCommand = new RelayCommand(() => { if (_current is { } item) _ = RunAsync(item, InputText); }, () => CanRetry);
         ToggleDetailsCommand = new RelayCommand(() => ShowDetails = !ShowDetails);
 
@@ -71,6 +76,24 @@ public sealed class PopupViewModel : ObservableObject
 
     /// <summary>Asks the window to focus the input field.</summary>
     public event EventHandler? InputRequested;
+
+    /// <summary>"Ersetzen" was chosen; the argument is the text to paste into the source window.</summary>
+    public event EventHandler<string>? ReplaceRequested;
+
+    private string? _replaceError;
+
+    /// <summary>Why pasting failed; the result stays in the popup so it can still be copied.</summary>
+    public string? ReplaceError
+    {
+        get => _replaceError;
+        set
+        {
+            if (Set(ref _replaceError, value))
+                OnPropertyChanged(nameof(HasReplaceError));
+        }
+    }
+
+    public bool HasReplaceError => !string.IsNullOrEmpty(ReplaceError);
 
     public IReadOnlyList<ActionItem> Actions { get; }
 
@@ -162,6 +185,7 @@ public sealed class PopupViewModel : ObservableObject
     public ICommand RunActionCommand { get; }
     public ICommand SubmitInputCommand { get; }
     public ICommand CopyCommand { get; }
+    public ICommand ReplaceCommand { get; }
     public ICommand RetryCommand { get; }
     public ICommand ToggleDetailsCommand { get; }
 
@@ -197,6 +221,7 @@ public sealed class PopupViewModel : ObservableObject
 
         CurrentAction = item;
         ShowDetails = false;
+        ReplaceError = null;
         State = PopupState.Running;
         using var running = new CancellationTokenSource();
         _running = running;

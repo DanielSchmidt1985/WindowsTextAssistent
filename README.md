@@ -4,8 +4,7 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Phase 3 (Popup, Aktionen und Design)**. Ersetzen (Phase 4), Einstellungsdialog (Phase 5) und Tray
-(Phase 6) folgen. Bis zum Tray-Icon zeigt die App ein vorläufiges Statusfenster; Schließen beendet das Tool.
+Stand: **Phase 4 (Ersetzen und Kopieren)**. Einstellungsdialog (Phase 5) und Tray (Phase 6) folgen. Bis zum Tray-Icon zeigt die App ein vorläufiges Statusfenster; Schließen beendet das Tool.
 
 ## Bedienung
 
@@ -13,7 +12,9 @@ Text markieren, **Strg+C+C** oder **Strg+Alt+Leertaste** drücken. Das Popup öf
 
 - Aktion per Klick oder mit den Tasten **1–9** starten. „Freitext“ fragt zuerst nach einer Anweisung (Enter führt aus).
 - Während Claude arbeitet, läuft ein Balken; **Esc** bricht ab (der CLI-Prozess wird beendet) und schließt.
-- **Kopieren** legt das Ergebnis in die Zwischenablage und schließt das Popup. **Ersetzen** ist noch ausgegraut (Phase 4).
+- **Kopieren** legt das Ergebnis in die Zwischenablage und schließt das Popup.
+- **Ersetzen** (oder **Enter**) setzt das Ergebnis anstelle der Markierung ins Quellfenster ein. Nur bei Aktionen mit
+  `"replace": true`. Danach steht die Zwischenablage wieder so wie vor dem Ersetzen.
 - Bei Fehlern steht eine kurze Meldung im Popup, die Rohausgabe der CLI unter „Details“, dazu „Erneut versuchen“.
 - Ein neuer Auslöser ersetzt ein offenes Popup und bricht dessen Aufruf ab.
 
@@ -38,7 +39,8 @@ Alle Farben stehen als Token in `src/ClaudeHotkey/Themes/Theme.Neptun.xaml`. Ohn
 Plan gibt es `HoverBrush`, `PressedBrush` und `SelectionBrush`.
 
 Zum Vergleichen mit dem Referenz-Screenshot öffnet `ClaudeHotkey.exe --demo <zustand>` das Popup mit Beispieltext,
-ohne Hook und ohne Claude-Aufruf. Zustände: `choose`, `input`, `running`, `result`, `error`, `nocapture`.
+ohne Hook und ohne Claude-Aufruf. Zustände: `choose`, `input`, `running`, `result`, `error`, `nocapture`,
+`replacefail`.
 
 ## Voraussetzungen
 
@@ -122,8 +124,27 @@ beim npm-Paket cross-spawn doppelt mit `^` maskiert (`ClaudeExecutable.BuildComm
   anderer Prozess die Zwischenablage hält. Das Tool liest deshalb über `GetDataObject`, das in diesem Fall eine
   Ausnahme wirft und damit wiederholt wird.
 
+## Ersetzen
+
+`Windows/TextReplacer.cs`, Ablauf:
+
+1. Das Vordergrundfenster wird schon beim Auslösen gemerkt (vor dem Popup).
+2. Zwischenablage sichern, Ergebnis als reinen Text hineinlegen, Popup ausblenden.
+3. Quellfenster aktivieren und bis zu 1 s warten, bis es wirklich vorne ist.
+4. Warten, bis keine Modifier-Taste mehr gedrückt ist, dann Strg+V per `SendInput`.
+5. `pasteDelayMs` warten (Standard 500 ms), damit das Programm die Zwischenablage lesen kann, dann den alten Inhalt
+   zurückholen. Hat in der Zwischenzeit jemand etwas Neues kopiert, bleibt das stehen.
+
+Scheitert ein Schritt, kommt das Popup mit einer Meldung zurück; das Ergebnis bleibt sichtbar und kopierbar. Ließ
+sich das Fenster nicht aktivieren, bleibt das Ergebnis zusätzlich in der Zwischenablage, um es selbst einzufügen.
+
+Fügt ein langsames Programm noch den alten Inhalt ein, `pasteDelayMs` in `actions.json` erhöhen (100–5000).
+
 ## Entscheidungen und Abweichungen vom Plan
 
+- **`pasteDelayMs`:** neue Einstellung, nicht im Plan. Ein Signal, wann ein Programm nach Strg+V die Zwischenablage
+  gelesen hat, gibt es nicht zuverlässig; der Windows-Zwischenablageverlauf öffnet sie zur selben Zeit ebenfalls.
+  Deshalb eine feste, einstellbare Wartezeit.
 - **Referenz-Screenshot:** `docs/neptun-reference.png` lag in Phase 3 nicht vor. Das Design nutzt die Startwerte aus
   dem Plan; der Abgleich (Design-Abnahme) ist offen.
 - **Control-Templates:** In Phase 3 gibt es eigene Templates für Button, TextBox, ScrollBar, ToolTip, ContextMenu,
