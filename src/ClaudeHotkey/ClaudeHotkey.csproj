@@ -16,6 +16,24 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Product>ClaudeHotkey</Product>
+    <Description>Hotkey-Textassistent mit Claude</Description>
+  </PropertyGroup>
+
+  <!-- Only for the single-file release build (see README, section Installation) -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <!-- WPF needs its native DLLs (wpfgfx, PresentationNative, ...) next to the runtime; inside the
+         single file they are unpacked on first start instead of lying next to the exe. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- No compression: measured 114 MB instead of 222 MB working set (compressed assemblies are
+         unpacked into memory), for 155 MB instead of 69 MB on disk. Memory matters more for a tray tool. -->
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <!-- Keeps ClaudeHotkey.Core.pdb out of the publish folder: one file is the whole delivery. -->
+    <AllowedReferenceRelatedFileExtensions>none</AllowedReferenceRelatedFileExtensions>
+    <!-- No trimming: WPF does not support it. -->
+    <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
 
   <ItemGroup>

@@ -4,7 +4,54 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Phase 6 (Tray, Autostart, Feinschliff)**. Die Auslieferung als einzelne `.exe` (Phase 7) folgt.
+Stand: **Version 1.0.0, alle sieben Phasen des Plans umgesetzt**.
+
+## Installation
+
+Voraussetzungen: Windows 10/11 (x64) und die Claude-CLI, angemeldet mit dem Abo (`claude auth login` in einem
+normalen Terminal, prüfen mit `claude auth status`). Eine .NET-Laufzeit ist nicht nötig, sie steckt in der `.exe`.
+
+1. Bauen (braucht das .NET 8 SDK, nur auf dem Build-Rechner):
+
+   ```
+   dotnet publish src/ClaudeHotkey -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+   ```
+
+   Ergebnis: eine einzelne Datei `publish\ClaudeHotkey.exe` (etwa 155 MB).
+2. Die Datei an einen festen Ort kopieren, empfohlen `%LOCALAPPDATA%\Programs\ClaudeHotkey\ClaudeHotkey.exe`
+   (keine Adminrechte nötig), und starten. Das Tool erscheint im Tray.
+3. Für den Start mit Windows: Tray → Einstellungen → Allgemein → „Mit Windows starten“ → Speichern. Das aus der
+   installierten `.exe` heraus tun, damit der Autostart-Eintrag auf diese Kopie zeigt.
+
+**Update:** `ClaudeHotkey.exe --exit` (oder Tray → Beenden), die neue `.exe` über die alte kopieren, starten.
+Einstellungen, Aktionen und Log liegen in `%APPDATA%\ClaudeHotkey` und bleiben erhalten.
+
+**Deinstallation:** In den Einstellungen „Mit Windows starten“ ausschalten und speichern, Tray → Beenden, dann
+`%LOCALAPPDATA%\Programs\ClaudeHotkey` und bei Bedarf `%APPDATA%\ClaudeHotkey` löschen.
+
+Beim ersten Start entpackt die `.exe` die nativen WPF-Bibliotheken nach `%TEMP%\.net\ClaudeHotkey`; das dauert
+einen Moment. Wird der Ordner gelöscht, entpackt sie beim nächsten Start neu.
+
+## Prüfliste
+
+Nach der Installation von Hand, aus dem Plan:
+
+- [ ] Notepad: Strg+C+C öffnet das Popup, Ersetzen funktioniert.
+- [ ] Word: Ersetzen übernimmt die Formatierung der Einfügestelle.
+- [ ] Outlook und Teams: Ersetzen im Nachrichtenfeld.
+- [ ] Browser: in einem Textfeld ersetzen, auf einer normalen Webseite nur kopieren.
+- [ ] Lange Texte (ca. 5000 Zeichen) sowie Umlaute, Emojis und Zeilenumbrüche kommen unverändert an.
+- [ ] Die Zwischenablage ist nach einem Durchlauf wie vorher, mindestens bei Text.
+- [ ] CLI nicht erreichbar oder nicht eingeloggt: Fehlermeldung statt Absturz.
+- [ ] DeepL-App beendet oder deren Hotkey geändert, damit nicht beide auf Strg+C+C reagieren.
+- [ ] Tray zeigt „Abo aktiv“, in der Console (platform.claude.com) taucht kein API-Verbrauch auf.
+- [ ] Einstellungsdialog: Aktion anlegen, Prompt ändern, testen, sortieren und löschen; Änderungen gelten ohne Neustart.
+- [ ] Der eigene Hotkey einer Aktion führt sie direkt auf dem markierten Text aus.
+- [ ] Nach einem Neustart von Windows läuft das Tool im Tray; „Beenden“ schließt es sauber.
+- [ ] Das Design stimmt mit dem Referenz-Screenshot überein (offen: `docs/neptun-reference.png` fehlt noch).
+
+Automatisch geprüft (`dotnet test`, 195 Tests) sind Konfiguration, CLI-Aufruf, Zwischenablage, Hotkey-Erkennung,
+Ersetzen-Ablauf, Einstellungsdialog, Log, Autostart und Einzelinstanz.
 
 ## Tray
 
@@ -309,10 +356,15 @@ In `actions.json` steht die Taste zweimal: `"hotkey": "ctrl+x+x"`, `"mainHotkey"
 - Fenster von Programmen mit Administratorrechten erreichen Hotkeys nicht, bei denen das Tool selbst kopiert (kein
   `SendInput` dorthin), solange das Tool ohne Adminrechte läuft. Strg+C+C funktioniert dort, weil der Nutzer selbst
   kopiert; „Ersetzen“ dagegen nicht.
-
 - Jeder Aufruf startet einen eigenen Claude-Code-Prozess; einige Sekunden bis zur Antwort sind normal.
 - Bei einem Enterprise-Konto (`subscriptionType: enterprise`) laufen die Aufrufe über den Sitz der Organisation.
   Wie sie abgerechnet werden, legt die Organisation fest; die Claude-Code-Startseite kann dabei „API Usage Billing“
   zeigen, obwohl kein API-Key benutzt wird.
 - Aufrufe über `claude -p` zählen gegen die Nutzungslimits des Abos. Ist das Limit erreicht, scheitert der Aufruf
-  mit einer Meldung.
+  mit einer Meldung. Diese Regeln haben sich 2026 mehrfach geändert; im Zweifel die Hilfe-Center-Seite prüfen.
+- **Formatierung:** Beim Ersetzen wird reiner Text eingefügt; Fett, Links usw. des markierten Textes gehen verloren.
+- **Textübernahme:** Einzelne Programme geben den markierten Text nicht per Strg+C heraus. Dann zeigt das Popup
+  „Kein markierter Text gefunden“.
+- **Die `.exe`:** etwa 155 MB und rund 115 MB Arbeitsspeicher, weil Laufzeit und WPF enthalten sind. Mit Kompression
+  wäre die Datei 69 MB groß, das Tool bräuchte aber 222 MB Arbeitsspeicher. Sie ist nicht signiert: Lädt man sie
+  aus dem Internet herunter, warnt SmartScreen; lokal gebaut oder kopiert erscheint keine Warnung.
