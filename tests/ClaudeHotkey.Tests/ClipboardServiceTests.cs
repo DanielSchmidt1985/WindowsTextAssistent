@@ -66,9 +66,12 @@ public class ClipboardServiceTests
             _service.SetText("überschrieben");
             _service.Restore(backup);
 
+            // Not Clipboard.ContainsData: it silently returns false while another process (the
+            // clipboard history service) holds the clipboard, which made this test flaky.
+            var formats = _service.Backup().Formats.Select(f => f.Key).ToList();
             Assert.Equal("plain", _service.GetText());
-            Assert.True(System.Windows.Clipboard.ContainsData(DataFormats.Html));
-            Assert.True(System.Windows.Clipboard.ContainsData(DataFormats.Rtf));
+            Assert.Contains(DataFormats.Html, formats);
+            Assert.Contains(DataFormats.Rtf, formats);
         });
     }
 

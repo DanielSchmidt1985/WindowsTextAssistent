@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ClaudeHotkey.Tests" />
+    <EmbeddedResource Include="Config\actions.default.json" LogicalName="ClaudeHotkey.Core.Config.actions.default.json" />
   </ItemGroup>
 
   <ItemGroup>

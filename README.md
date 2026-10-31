@@ -4,8 +4,41 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Phase 2 (Hotkey und Textübernahme)**. Popup, Ersetzen und Tray folgen in den nächsten Phasen.
-Bis dahin zeigt die App ein vorläufiges Testfenster, das jede Textübernahme auflistet; Schließen beendet das Tool.
+Stand: **Phase 3 (Popup, Aktionen und Design)**. Ersetzen (Phase 4), Einstellungsdialog (Phase 5) und Tray
+(Phase 6) folgen. Bis zum Tray-Icon zeigt die App ein vorläufiges Statusfenster; Schließen beendet das Tool.
+
+## Bedienung
+
+Text markieren, **Strg+C+C** oder **Strg+Alt+Leertaste** drücken. Das Popup öffnet sich an der Maus.
+
+- Aktion per Klick oder mit den Tasten **1–9** starten. „Freitext“ fragt zuerst nach einer Anweisung (Enter führt aus).
+- Während Claude arbeitet, läuft ein Balken; **Esc** bricht ab (der CLI-Prozess wird beendet) und schließt.
+- **Kopieren** legt das Ergebnis in die Zwischenablage und schließt das Popup. **Ersetzen** ist noch ausgegraut (Phase 4).
+- Bei Fehlern steht eine kurze Meldung im Popup, die Rohausgabe der CLI unter „Details“, dazu „Erneut versuchen“.
+- Ein neuer Auslöser ersetzt ein offenes Popup und bricht dessen Aufruf ab.
+
+## Konfiguration
+
+`%APPDATA%\ClaudeHotkey\actions.json` entsteht beim ersten Start aus `src/ClaudeHotkey.Core/Config/actions.default.json`
+(eingebettet in die DLL). Die Datei wird vor jedem Popup neu gelesen, wenn sie sich geändert hat; Änderungen an
+Aktionen und Prompts gelten also ohne Neustart. `doubleCopyMs` gilt ab der nächsten Übernahme, `secondHotkey` erst
+nach einem Neustart (live ab Phase 5).
+
+- Erlaubt sind Kommentare (`//`) und Kommas am Ende.
+- Geprüft wird: eindeutige `id`, nicht leerer `prompt`, `askInput` nur mit `{input}` im Prompt, gültige und nicht
+  doppelt vergebene Hotkeys, Wertebereiche für `doubleCopyMs` (100–2000) und `timeoutSeconds` (5–600).
+- Ist die Datei fehlerhaft, bleibt die zuletzt gültige Konfiguration aktiv; die Fehler stehen im Statusfenster.
+- Zusätzlich zum Plan: `settings.autostart`, `settings.claudePath` und pro Aktion `hotkey` und `enabled`
+  (für den Einstellungsdialog). `enabled: false` blendet eine Aktion im Popup aus.
+
+### Design anpassen
+
+Alle Farben stehen als Token in `src/ClaudeHotkey/Themes/Theme.Neptun.xaml`. Ohne Neubau lassen sie sich in
+`%APPDATA%\ClaudeHotkey\theme.json` überschreiben, z. B. `{ "AccentBrush": "#3794FF" }`. Neben den Tokens aus dem
+Plan gibt es `HoverBrush`, `PressedBrush` und `SelectionBrush`.
+
+Zum Vergleichen mit dem Referenz-Screenshot öffnet `ClaudeHotkey.exe --demo <zustand>` das Popup mit Beispieltext,
+ohne Hook und ohne Claude-Aufruf. Zustände: `choose`, `input`, `running`, `result`, `error`, `nocapture`.
 
 ## Voraussetzungen
 
@@ -85,9 +118,23 @@ beim npm-Paket cross-spawn doppelt mit `^` maskiert (`ClaudeExecutable.BuildComm
 - **Zwischenablageverlauf von Windows:** Der Dienst `cbdhsvc` liest nach jedem Schreiben die Daten per COM aus
   unserem Prozess, während er die Zwischenablage offen hält. Gewartet wird deshalb mit `Thread.Join` (verarbeitet
   COM-Nachrichten) statt `Thread.Sleep`; sonst warten beide Seiten aufeinander und Zugriffe scheitern nach Sekunden.
+- `Clipboard.ContainsText`, `GetText` und `ContainsData` von WPF liefern still `false` bzw. `""`, solange ein
+  anderer Prozess die Zwischenablage hält. Das Tool liest deshalb über `GetDataObject`, das in diesem Fall eine
+  Ausnahme wirft und damit wiederholt wird.
 
 ## Entscheidungen und Abweichungen vom Plan
 
+- **Referenz-Screenshot:** `docs/neptun-reference.png` lag in Phase 3 nicht vor. Das Design nutzt die Startwerte aus
+  dem Plan; der Abgleich (Design-Abnahme) ist offen.
+- **Control-Templates:** In Phase 3 gibt es eigene Templates für Button, TextBox, ScrollBar, ToolTip, ContextMenu,
+  MenuItem, Separator und ProgressBar. ComboBox, CheckBox, ListBox und TabControl folgen in Phase 5 mit dem
+  Einstellungsdialog, der sie als Erster verwendet.
+- **Tasten 1–9** im Popup starten Aktionen; das steht nicht im Plan, spart aber den Griff zur Maus.
+- **Popup-Fokus:** Weil das Popup aus einem Hook heraus erscheint, erlaubt Windows ihm den Vordergrund nicht direkt.
+  `ForegroundWindow.Activate` hängt sich dafür kurz an die Eingabewarteschlange des aktiven Fensters
+  (`AttachThreadInput`).
+- **DPI:** Die App ist Per-Monitor-DPI-aware (`app.manifest`), damit Mausposition und Monitor-Arbeitsbereich in
+  denselben Pixeln rechnen.
 - **Zwischenablage bei Strg+C+C:** Hier bleibt der markierte Text in der Zwischenablage, wie bei DeepL. Der Nutzer
   hat selbst kopiert, und der Inhalt davor lässt sich nicht zuverlässig sichern: Das erste Strg+C hat ihn schon
   überschrieben, bevor das Tool weiß, dass ein zweites folgt. Wiederhergestellt wird beim zweiten Hotkey und

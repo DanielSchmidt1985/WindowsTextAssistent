@@ -26,7 +26,15 @@ public sealed class ClipboardService
 
     public static uint SequenceNumber => NativeMethods.GetClipboardSequenceNumber();
 
-    public string? GetText() => Retry(() => WpfClipboard.ContainsText() ? WpfClipboard.GetText(TextDataFormat.UnicodeText) : null);
+    // Not Clipboard.ContainsText/GetText: they return false/"" instead of throwing while another
+    // process holds the clipboard, so Retry would never see the failure.
+    public string? GetText() => Retry(() =>
+    {
+        var data = WpfClipboard.GetDataObject();
+        if (data is null || !data.GetDataPresent(DataFormats.UnicodeText, autoConvert: true))
+            return null;
+        return data.GetData(DataFormats.UnicodeText, autoConvert: true) as string;
+    });
 
     public void SetText(string text) => Retry(() =>
     {

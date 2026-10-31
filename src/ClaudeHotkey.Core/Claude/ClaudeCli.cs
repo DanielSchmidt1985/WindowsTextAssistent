@@ -166,7 +166,7 @@ public sealed class ClaudeCli
     public static string MessageFor(ClaudeErrorKind kind, TimeSpan? timeout = null) => kind switch
     {
         ClaudeErrorKind.CliNotFound => "Claude-CLI nicht gefunden. Pfad in den Einstellungen prüfen oder Claude Code installieren.",
-        ClaudeErrorKind.NotLoggedIn => "Claude-CLI ist nicht angemeldet. Im Terminal „claude“ starten und mit /login anmelden.",
+        ClaudeErrorKind.NotLoggedIn => "Claude-CLI ist nicht angemeldet. Im Terminal „claude auth login“ ausführen.",
         ClaudeErrorKind.LimitReached => "Nutzungslimit des Abos erreicht. Später erneut versuchen.",
         ClaudeErrorKind.EmptyResponse => "Claude hat keine Antwort geliefert.",
         ClaudeErrorKind.Timeout => timeout is { } t

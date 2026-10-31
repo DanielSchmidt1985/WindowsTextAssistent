@@ -3,8 +3,8 @@ using System.Windows;
 namespace ClaudeHotkey.Views;
 
 /// <summary>
-/// Temporary window for the phase 2 acceptance test: lists every capture. The popup (phase 3)
-/// and the tray (phase 6) replace it.
+/// Temporary status window: preflight, hotkeys, captures and config errors. The tray icon
+/// (phase 6) replaces it.
 /// </summary>
 public partial class CaptureLogWindow : Window
 {
