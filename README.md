@@ -50,7 +50,7 @@ Nach der Installation von Hand, aus dem Plan:
 - [ ] Nach einem Neustart von Windows läuft das Tool im Tray; „Beenden“ schließt es sauber.
 - [ ] Das Design stimmt mit dem Referenz-Screenshot überein (offen: `docs/neptun-reference.png` fehlt noch).
 
-Automatisch geprüft (`dotnet test`, 195 Tests) sind Konfiguration, CLI-Aufruf, Zwischenablage, Hotkey-Erkennung,
+Automatisch geprüft (`dotnet test`, 200 Tests) sind Konfiguration, CLI-Aufruf, Zwischenablage, Hotkey-Erkennung,
 Ersetzen-Ablauf, Einstellungsdialog, Log, Autostart und Einzelinstanz.
 
 ## Tray

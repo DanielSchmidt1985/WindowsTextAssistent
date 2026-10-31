@@ -28,12 +28,44 @@ public class ClipboardServiceTests
             throw new Xunit.Sdk.XunitException($"Failed on STA thread: {error}");
     }
 
+    /// <summary>
+    /// Direct clipboard calls for test setup, retried like ClipboardService does: right after the
+    /// previous test wrote, the clipboard history service (cbdhsvc) may still hold it open, and an
+    /// unprotected call fails with CLIPBRD_E_CANT_OPEN. That made this class flaky in full runs.
+    /// </summary>
+    private static void Direct(Action action)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                action();
+                return;
+            }
+            catch (System.Runtime.InteropServices.COMException) when (attempt < 10)
+            {
+                Thread.CurrentThread.Join(30); // pumps COM messages, see ClipboardService.Retry
+            }
+        }
+    }
+
     private void WithUserClipboardKept(Action test) => OnSta(() =>
     {
         var userContent = _service.Backup();
         try { test(); }
         finally { _service.Restore(userContent); }
     });
+
+    [Theory]
+    [InlineData(unchecked((int)0x800401D0), true)]  // CLIPBRD_E_CANT_OPEN: someone else holds the clipboard
+    [InlineData(unchecked((int)0x80010001), true)]  // RPC_E_CALL_REJECTED
+    [InlineData(unchecked((int)0x8001010A), true)]  // RPC_E_SERVERCALL_RETRYLATER
+    [InlineData(unchecked((int)0x80040064), false)] // DV_E_FORMATETC: format really not available
+    [InlineData(unchecked((int)0x80004005), false)] // E_FAIL
+    public void Only_a_busy_clipboard_counts_as_transient(int hresult, bool expected)
+    {
+        Assert.Equal(expected, ClipboardService.IsTransient(new System.Runtime.InteropServices.COMException("x", hresult)));
+    }
 
     [Fact]
     public void Text_survives_backup_and_restore()
@@ -60,7 +92,7 @@ public class ClipboardServiceTests
             data.SetData(DataFormats.UnicodeText, "plain");
             data.SetData(DataFormats.Html, "<b>fett</b>");
             data.SetData(DataFormats.Rtf, @"{\rtf1 {\b fett}}");
-            System.Windows.Clipboard.SetDataObject(data, copy: true);
+            Direct(() => System.Windows.Clipboard.SetDataObject(data, copy: true));
             var backup = _service.Backup();
 
             _service.SetText("überschrieben");
@@ -80,7 +112,7 @@ public class ClipboardServiceTests
     {
         WithUserClipboardKept(() =>
         {
-            System.Windows.Clipboard.Clear();
+            Direct(System.Windows.Clipboard.Clear);
             var backup = _service.Backup();
 
             _service.SetText("x");
