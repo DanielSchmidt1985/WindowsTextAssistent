@@ -50,7 +50,7 @@ Flow of one use:
    Ctrl+C, read, restore.
 3. **Popup** (`Views/PopupWindow`, `ViewModels/PopupViewModel`) at the mouse (`Windows/ForegroundWindow`: placement
    in physical pixels, app is per-monitor DPI aware; activation via `AttachThreadInput`).
-4. **Claude** (`Claude/ClaudeCli`) — `claude -p --model … --output-format stream-json --verbose --include-partial-messages --system-prompt "<system prompt>\n\nAufgabe:\n<action prompt>" --no-session-persistence --strict-mcp-config --tools ""`;
+4. **Claude** (`Claude/ClaudeCli`) — `claude -p --model … --output-format stream-json --verbose --include-partial-messages --system-prompt "<system prompt>\n\nAufgabe:\n<action prompt>" --settings '{"disableAllHooks":true}' --no-session-persistence --strict-mcp-config --tools ""`;
    selected text only over stdin as `<text>…</text>`; empty temp working dir; API-key and Claude-Code session env
    vars removed. `--tools ""` must stay last (variadic). Actions with `feedback` add `--json-schema` and read
    `structured_output` {text, feedback} from the final `type: result` line. `PartialTextReader` turns the

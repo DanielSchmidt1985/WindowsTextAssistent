@@ -89,6 +89,13 @@ public sealed class ClaudeCli
     public const string FeedbackSchema =
         """{"type":"object","properties":{"text":{"type":"string"},"feedback":{"type":"string"}},"required":["text","feedback"],"additionalProperties":false}""";
 
+    /// <summary>
+    /// Switches off the user's hooks (e.g. SessionStart hooks of plugins) for our calls. They cost
+    /// seconds per call and inject text the model then comments on in its answer (checked with
+    /// Claude Code 2.1.240: 5–9 s with hooks, about 3 s without).
+    /// </summary>
+    public const string NoHooksSettings = """{"disableAllHooks":true}""";
+
     private static bool WantsFeedback(ClaudeRequest request) => !string.IsNullOrWhiteSpace(request.FeedbackInstruction);
 
     public static IReadOnlyList<string> BuildArguments(ClaudeRequest request)
@@ -107,6 +114,7 @@ public sealed class ClaudeCli
             arguments.AddRange(["--json-schema", FeedbackSchema]);
         arguments.AddRange(
         [
+            "--settings", NoHooksSettings,
             "--no-session-persistence",
             "--strict-mcp-config",
             // Last on purpose: --tools takes a variadic list and would swallow following arguments.
@@ -230,6 +238,7 @@ public sealed class ClaudeCli
             "--model", model,
             "--output-format", "stream-json",
             "--verbose",
+            "--settings", NoHooksSettings,
             "--no-session-persistence",
             "--strict-mcp-config",
             "--tools", "",

@@ -34,6 +34,7 @@ public class ClaudeCliTests
         Assert.Equal(
             ["-p", "--model", "haiku", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--system-prompt",
              "Antworte nur mit dem Ergebnis.\n\nAufgabe:\nKorrigiere den Text.",
+             "--settings", """{"disableAllHooks":true}""",
              "--no-session-persistence", "--strict-mcp-config", "--tools", ""],
             request.Arguments);
         Assert.Equal("<text>\nHallo Welt\n</text>", request.StandardInput);

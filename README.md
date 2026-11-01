@@ -207,7 +207,7 @@ Geprüft mit Claude Code 2.1.240 (`claude --help`). Jeder Aufruf:
 
 ```
 claude -p --model <modell> --output-format stream-json --verbose --include-partial-messages --system-prompt "<system-prompt>\n\nAufgabe:\n<aktionsprompt>"
-       --no-session-persistence --strict-mcp-config --tools ""
+       --settings '{"disableAllHooks":true}' --no-session-persistence --strict-mcp-config --tools ""
 ```
 
 - Der markierte Text geht nur über stdin, als `<text>\n…\n</text>`, UTF-8 ohne BOM.
@@ -218,6 +218,10 @@ claude -p --model <modell> --output-format stream-json --verbose --include-parti
   den `--bare`-Modus einschalten, der den Abo-Login nie liest, und `ANTHROPIC_BASE_URL` auf den Proxy der Sitzung
   zeigen. `CLAUDE_CONFIG_DIR` bleibt erhalten. Ein Gateway in der `settings.json` von Claude Code wirkt weiterhin.
 - `--strict-mcp-config` ohne `--mcp-config` lädt keine MCP-Server (schnellerer Start, keine Werkzeuge).
+- `--settings '{"disableAllHooks":true}'` schaltet die Hooks des Nutzers ab (auch die SessionStart-Hooks von
+  Plugins), nur für die Aufrufe des Tools. Gemessen am 01.11.2026 mit `haiku`: 5–9 s mit Hooks, etwa 3 s ohne. Dazu
+  kommt: Der Hook-Text landet im Kontext, und das Modell ging in seiner Antwort darauf ein, statt nur die Aufgabe
+  zu erledigen. Die übrigen Einstellungen (z. B. ein Gateway) bleiben aktiv; auch der Preflight nutzt den Schalter.
 - `--bare` wird bewusst **nicht** genutzt: Es liest laut Hilfe nur `ANTHROPIC_API_KEY` und nie den Abo-Login.
 - Ausgabe: eine JSON-Zeile pro Ereignis. Maßgeblich ist die letzte (`type: result`): Der Antworttext steht in
   `result`, Fehler erkennt das Tool an `is_error`, `api_error_status` (401/403 = Login, 429 = Limit) und am Text in
