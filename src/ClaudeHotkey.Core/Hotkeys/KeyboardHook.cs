@@ -6,7 +6,8 @@ namespace ClaudeHotkey.Core.Hotkeys;
 
 /// <param name="Gesture">The double press that was recognised, e.g. Ctrl+C+C.</param>
 /// <param name="ClipboardSequence">Clipboard sequence number at the second press, before the app reacted to it.</param>
-public sealed record DoublePressEventArgs(HotkeyGesture Gesture, uint ClipboardSequence);
+/// <param name="ClipboardSequenceAtFirstPress">The same at the first press: unchanged means the app copied (cut) nothing.</param>
+public sealed record DoublePressEventArgs(HotkeyGesture Gesture, uint ClipboardSequence, uint ClipboardSequenceAtFirstPress);
 
 /// <summary>
 /// Low-level keyboard hook (WH_KEYBOARD_LL) that detects double presses: Ctrl+C+C and the ones
@@ -20,6 +21,7 @@ public sealed class KeyboardHook : IDisposable
     private readonly SynchronizationContext _context;
     private readonly LowLevelKeyboardProc _callback; // kept in a field so the GC does not collect it
     private IntPtr _hook;
+    private uint _sequenceAtPreviousKeyDown;
 
     public KeyboardHook(int doublePressMilliseconds)
     {
@@ -58,12 +60,17 @@ public sealed class KeyboardHook : IDisposable
                 var message = (int)wParam;
                 if (message is WM_KEYDOWN or WM_SYSKEYDOWN)
                 {
+                    // The detector starts over on any other key, so the previous non-modifier
+                    // key-down of a recognised double press is its first press.
+                    var sequence = GetClipboardSequenceNumber();
                     if (_detector.OnKeyDown((int)data.vkCode, CurrentModifiers(), data.time) is { } gesture)
                     {
                         // Keep the callback short: Windows drops hooks that take too long.
-                        var args = new DoublePressEventArgs(gesture, GetClipboardSequenceNumber());
+                        var args = new DoublePressEventArgs(gesture, sequence, _sequenceAtPreviousKeyDown);
                         _context.Post(_ => DoublePress?.Invoke(this, args), null);
                     }
+                    if (!DoublePressDetector.IsModifier((int)data.vkCode))
+                        _sequenceAtPreviousKeyDown = sequence;
                 }
                 else if (message is WM_KEYUP or WM_SYSKEYUP)
                 {

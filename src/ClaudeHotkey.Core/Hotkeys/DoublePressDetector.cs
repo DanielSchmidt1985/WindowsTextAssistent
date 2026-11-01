@@ -62,7 +62,7 @@ public sealed class DoublePressDetector(int windowMilliseconds)
 
     public void OnKeyUp(int virtualKey) => _heldSince.Remove(virtualKey);
 
-    private static bool IsModifier(int virtualKey) =>
+    internal static bool IsModifier(int virtualKey) =>
         virtualKey is 0x10 or 0x11 or 0x12 // Shift, Ctrl, Alt
             or >= 0xA0 and <= 0xA5        // left/right Shift, Ctrl, Alt
             or 0x5B or 0x5C;              // Windows keys

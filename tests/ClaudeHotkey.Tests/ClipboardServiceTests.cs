@@ -196,10 +196,12 @@ public class TextCaptureTests
     [Fact]
     public async Task Double_copy_path_reads_text_and_keeps_it()
     {
-        var clipboard = new FakeClipboard { Text = "markiert" };
+        var clipboard = new FakeClipboard { Text = "alt" };
+        var beforeFirstPress = clipboard.SequenceNumber;
+        clipboard.SimulateCopy("markiert"); // the app copied on the first press
         var keyboard = new FakeKeyboard(() => { });
 
-        var result = await new TextCapture(clipboard, keyboard).AfterUserCopyAsync(clipboard.SequenceNumber);
+        var result = await new TextCapture(clipboard, keyboard).AfterUserCopyAsync(beforeFirstPress, clipboard.SequenceNumber, 0x43);
 
         Assert.Equal("markiert", result.Text);
         Assert.Equal("markiert", clipboard.Text);
@@ -210,11 +212,31 @@ public class TextCaptureTests
     [Fact]
     public async Task Double_copy_path_with_empty_clipboard_reports()
     {
-        var clipboard = new FakeClipboard { Text = null };
+        var clipboard = new FakeClipboard { Text = "alt" };
+        var beforeFirstPress = clipboard.SequenceNumber;
+        clipboard.Text = null;
+        clipboard.SimulateCopy("");
 
-        var result = await new TextCapture(clipboard, new FakeKeyboard(() => { })).AfterUserCopyAsync(clipboard.SequenceNumber);
+        var result = await new TextCapture(clipboard, new FakeKeyboard(() => { })).AfterUserCopyAsync(beforeFirstPress, clipboard.SequenceNumber, 0x43);
 
         Assert.False(result.Success);
+    }
+
+    [Fact]
+    public async Task Double_cut_in_read_only_text_copies_itself_instead_of_taking_the_old_clipboard()
+    {
+        // Ctrl+X+X on a web page or a received mail: the app cuts nothing, the clipboard keeps
+        // its old entry. The tool then copies the selection itself and puts the old entry back.
+        var clipboard = new FakeClipboard { Text = "alter Eintrag" };
+        var unchanged = clipboard.SequenceNumber;
+        var keyboard = new FakeKeyboard(() => clipboard.SimulateCopy("markierter Text"));
+
+        var result = await new TextCapture(clipboard, keyboard).AfterUserCopyAsync(unchanged, unchanged, 0x58);
+
+        Assert.Equal("markierter Text", result.Text);
+        Assert.Equal([0x43], keyboard.Sent);
+        Assert.Equal(0x58, keyboard.WaitedForKey); // X has to be released before Ctrl+C goes out
+        Assert.Equal("alter Eintrag", clipboard.Text);
     }
 
     internal sealed class FakeClipboard : IClipboard

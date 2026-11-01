@@ -286,6 +286,11 @@ Wie der Text geholt wird, hängt von der Kombination ab:
   nie geschluckt, Kopieren funktioniert weiter normal. Gedrückt gehaltene Tasten (Autorepeat), weitere Modifier
   (Strg+Umschalt+C, Strg+Alt+C) und von Programmen erzeugte Tastendrücke zählen nicht; jede andere Taste dazwischen
   setzt die Erkennung zurück. Danach wartet das Tool bis zu 600 ms, bis das Programm fertig kopiert hat.
+  Hat sich die Zwischenablage seit dem ersten Druck gar nicht geändert, hat das Programm nichts kopiert bzw.
+  ausgeschnitten; typisch ist Strg+X in schreibgeschütztem Text (Webseite, empfangene Mail, Teams-Nachricht, PDF).
+  Dann stünde dort noch ein alter Eintrag. Das Tool kopiert die Markierung in dem Fall selbst wie bei den anderen
+  Kombinationen und stellt die Zwischenablage danach wieder her. Dafür merkt sich der Hook die Sequenznummer der
+  Zwischenablage auch beim ersten Druck.
 - **Jede andere Kombination** (z. B. Strg+Alt+Leertaste oder Strg+Alt+Q+Q): Das Tool wartet, bis die Hotkey-Tasten
   losgelassen sind (sonst käme Strg+Alt+C an), sichert die Zwischenablage, sendet Strg+C per `SendInput`, liest den
   Text und stellt die Zwischenablage wieder her. Ändert sich die Zwischenablage nicht, war nichts markiert.
@@ -342,7 +347,8 @@ In `actions.json` steht die Taste zweimal: `"hotkey": "ctrl+x+x"`, `"mainHotkey"
   nicht, ob ein zweiter folgt. Deshalb Kombinationen wählen, deren einfacher Druck nichts Schlimmes tut.
 - **Strg+X+X** schneidet die Markierung beim ersten Druck aus, das Tool nimmt den Text dann aus der Zwischenablage
   (wie bei Strg+C+C). „Ersetzen“ setzt das Ergebnis an der Stelle ein. Schließt man das Popup ohne Ersetzen, fehlt
-  der Text im Dokument; Strg+Z oder Strg+V holt ihn zurück.
+  der Text im Dokument; Strg+Z oder Strg+V holt ihn zurück. In schreibgeschütztem Text schneidet Strg+X nichts
+  aus; dann kopiert das Tool selbst (siehe oben), und „Ersetzen“ hat dort ohnehin keine Wirkung.
 - Bei allen anderen Tasten kopiert das Tool nach dem zweiten Druck selbst (Strg+C) und stellt die Zwischenablage
   danach wieder her.
 - Einfacher und doppelter Druck derselben Tasten (Strg+Alt+K und Strg+Alt+K+K) schließen sich gegenseitig aus. Der

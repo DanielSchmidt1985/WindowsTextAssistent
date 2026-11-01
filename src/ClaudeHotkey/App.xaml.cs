@@ -109,9 +109,9 @@ public partial class App : Application
         _capture = new TextCapture(new SystemClipboard(_clipboard), new KeyboardInput());
 
         _hook = new KeyboardHook(settings.DoubleCopyMs);
-        _hook.DoublePress += (_, args) => OnHotkey(args.Gesture, args.ClipboardSequence);
+        _hook.DoublePress += (_, args) => OnHotkey(args.Gesture, args.ClipboardSequenceAtFirstPress, args.ClipboardSequence);
         _hotkeys = new GlobalHotkeys();
-        _hotkeys.Pressed += (_, gesture) => OnHotkey(gesture, ClipboardService.SequenceNumber);
+        _hotkeys.Pressed += (_, gesture) => OnHotkey(gesture, ClipboardService.SequenceNumber, ClipboardService.SequenceNumber);
         RegisterHotkeys(notifyWhenTaken: true);
 
         // While a hotkey field in the settings has focus, the combination must reach the field.
@@ -146,16 +146,17 @@ public partial class App : Application
 
     /// <summary>
     /// Main hotkey or an action's hotkey was pressed. With Ctrl+C+C and Ctrl+X+X the app has
-    /// already copied (cut) the text; for any other combination the tool copies itself.
+    /// normally already copied (cut) the text; for any other combination the tool copies itself.
     /// </summary>
+    /// <param name="sequenceAtFirstPress">Clipboard sequence number at the first press of a double press.</param>
     /// <param name="clipboardSequence">Clipboard sequence number at the (second) press.</param>
-    private void OnHotkey(HotkeyGesture gesture, uint clipboardSequence)
+    private void OnHotkey(HotkeyGesture gesture, uint sequenceAtFirstPress, uint clipboardSequence)
     {
         if (_capture is null || !_hotkeyTargets.TryGetValue(gesture, out var actionId))
             return;
         Capture(actionId is null ? "main-hotkey" : "action-hotkey",
             gesture.AppCopiesItself
-                ? () => _capture.AfterUserCopyAsync(clipboardSequence)
+                ? () => _capture.AfterUserCopyAsync(sequenceAtFirstPress, clipboardSequence, gesture.VirtualKey)
                 : () => _capture.BySendingCopyAsync(gesture.VirtualKey),
             actionId);
     }

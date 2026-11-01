@@ -44,13 +44,20 @@ public sealed class TextCapture(IClipboard clipboard, IKeyboardInput keyboard)
     public static string KeysHeldMessage => Lang.T("Tasten des Hotkeys wurden nicht losgelassen.", "The hotkey keys were not released.");
 
     /// <summary>
-    /// After Ctrl+C+C: the user copied on purpose, so the text stays in the clipboard (as with
-    /// DeepL). Waits for the app to finish its copy, then reads the text.
+    /// After Ctrl+C+C or Ctrl+X+X: the user copied (cut) on purpose, so the text stays in the
+    /// clipboard (as with DeepL). Waits for the app to finish, then reads the text. If the app put
+    /// nothing there at all, e.g. Ctrl+X in read-only text (web page, received mail), the clipboard
+    /// still holds an old entry; then the tool copies the selection itself like for other hotkeys.
     /// </summary>
-    public async Task<CaptureResult> AfterUserCopyAsync(uint sequenceAtSecondCopy)
+    /// <param name="sequenceAtFirstPress">Clipboard sequence number at the first press, before the app reacted.</param>
+    /// <param name="sequenceAtSecondPress">The same at the second press.</param>
+    /// <param name="hotkeyVirtualKey">C or X; has to be released before the tool sends Ctrl+C.</param>
+    public async Task<CaptureResult> AfterUserCopyAsync(uint sequenceAtFirstPress, uint sequenceAtSecondPress, int hotkeyVirtualKey)
     {
-        await clipboard.WaitForChangeAsync(sequenceAtSecondCopy, CopyTimeout);
-        // Even without a change the first Ctrl+C has already put the text there.
+        await clipboard.WaitForChangeAsync(sequenceAtSecondPress, CopyTimeout);
+        if (clipboard.SequenceNumber == sequenceAtFirstPress)
+            return await BySendingCopyAsync(hotkeyVirtualKey);
+        // Even without a change at the second press the first one has already put the text there.
         return FromText(clipboard.GetText());
     }
 
