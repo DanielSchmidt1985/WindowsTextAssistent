@@ -322,7 +322,7 @@ public partial class App : Application
             capture.Text,
             capture.Message,
             config,
-            (request, token) => cli.RunAsync(request, token),
+            (request, onPartialText, token) => cli.RunAsync(request, onPartialText, token),
             text => _clipboard.SetText(text));
         viewModel.RunCompleted += (_, run) => _log.Write("claude", run.ActionId, run.Duration, run.Error.ToString());
 
@@ -408,10 +408,21 @@ public partial class App : Application
         const string sample = "Hallo zusammen, anbei die Unterlagen für das Meeting morgen. Bitte schaut sie euch vorher kurtz an und gebt mir bescheid, falls etwas fehlt.";
         var config = ActionConfig.Parse(DefaultConfig.Json());
 
-        PopupViewModel.RunClaude run = state switch
+        PopupViewModel.RunClaudeStreaming run = state switch
         {
-            "running" => async (_, token) => { await Task.Delay(Timeout.Infinite, token); return null!; },
-            "feedback" => async (_, _) =>
+            // Streams the first half of a sample answer, then keeps running until Esc.
+            "running" => async (_, onPartialText, token) =>
+            {
+                var words = "Hallo zusammen, anbei die Unterlagen für das Meeting morgen. Bitte schaut".Split(' ');
+                for (var i = 1; i <= words.Length; i++)
+                {
+                    await Task.Delay(120, token);
+                    onPartialText(string.Join(' ', words.Take(i)));
+                }
+                await Task.Delay(Timeout.Infinite, token);
+                return null!;
+            },
+            "feedback" => async (_, _, _) =>
             {
                 await Task.Delay(300);
                 return new ClaudeResult(ClaudeErrorKind.None,
@@ -420,10 +431,10 @@ public partial class App : Application
                     "• „I want make“ → „I would like to“: nach „want“ steht „to“, „would like“ klingt höflicher.\n" +
                     "• „tomorow“ → „tomorrow“: zwei r, ein w.");
             },
-            "error" => (_, _) => Task.FromResult(new ClaudeResult(ClaudeErrorKind.NotLoggedIn, null,
+            "error" => (_, _, _) => Task.FromResult(new ClaudeResult(ClaudeErrorKind.NotLoggedIn, null,
                 ClaudeCli.MessageFor(ClaudeErrorKind.NotLoggedIn),
                 "Exit-Code: 1\n\nstdout:\n{\"is_error\":true,\"result\":\"Failed to authenticate: OAuth session expired\"}")),
-            _ => async (_, _) =>
+            _ => async (_, _, _) =>
             {
                 await Task.Delay(300);
                 return new ClaudeResult(ClaudeErrorKind.None,

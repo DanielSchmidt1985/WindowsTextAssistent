@@ -8,6 +8,8 @@ namespace ClaudeHotkey.Core.Claude;
 /// Everything needed to start one child process. <paramref name="RawArguments"/>, when set, is
 /// used verbatim instead of <paramref name="Arguments"/> (only for the cmd.exe route).
 /// <paramref name="RemovedEnvironmentVariables"/> may end in <c>*</c> to remove a whole prefix.
+/// <paramref name="StandardOutputLine"/>, when set, gets every stdout line as soon as it arrives
+/// (on a worker thread); the full output is still returned at the end.
 /// </summary>
 public sealed record ProcessRequest(
     string FileName,
@@ -15,7 +17,8 @@ public sealed record ProcessRequest(
     string? RawArguments,
     string WorkingDirectory,
     string? StandardInput,
-    IReadOnlyList<string> RemovedEnvironmentVariables);
+    IReadOnlyList<string> RemovedEnvironmentVariables,
+    Action<string>? StandardOutputLine = null);
 
 public sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError);
 
@@ -73,7 +76,7 @@ public sealed class ProcessRunner : IProcessRunner
             catch (InvalidOperationException) { /* already exited */ }
         });
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stdoutTask = ReadOutputAsync(process.StandardOutput, request.StandardOutputLine);
         var stderrTask = process.StandardError.ReadToEndAsync();
 
         try
@@ -93,6 +96,20 @@ public sealed class ProcessRunner : IProcessRunner
 
         cancellationToken.ThrowIfCancellationRequested();
         return new ProcessResult(process.ExitCode, stdout, stderr);
+    }
+
+    private static async Task<string> ReadOutputAsync(StreamReader reader, Action<string>? onLine)
+    {
+        if (onLine is null)
+            return await reader.ReadToEndAsync().ConfigureAwait(false);
+
+        var all = new StringBuilder();
+        while (await reader.ReadLineAsync().ConfigureAwait(false) is { } line)
+        {
+            all.Append(line).Append('\n');
+            onLine(line);
+        }
+        return all.ToString();
     }
 
     /// <summary>Removes the given names; a trailing <c>*</c> removes every variable with that prefix.</summary>

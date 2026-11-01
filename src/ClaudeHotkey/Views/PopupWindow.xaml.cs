@@ -45,6 +45,8 @@ public partial class PopupWindow : Window
             ForegroundWindow.Activate(new WindowInteropHelper(this).Handle);
         };
         LayoutUpdated += (_, _) => UpdateMaxHeights();
+        // Follow the text while it streams in, once it is longer than the box.
+        StreamBox.TextChanged += (_, _) => StreamBox.ScrollToEnd();
     }
 
     private void Place() => ForegroundWindow.PlaceNear(new WindowInteropHelper(this).Handle, _anchor.X, _anchor.Y);
@@ -54,6 +56,7 @@ public partial class PopupWindow : Window
     {
         var available = SystemParameters.WorkArea.Height / _scale();
         ResultBox.MaxHeight = Math.Max(120, available * 0.45);
+        StreamBox.MaxHeight = ResultBox.MaxHeight;
         FeedbackBox.MaxHeight = Math.Max(80, available * 0.3);
     }
 

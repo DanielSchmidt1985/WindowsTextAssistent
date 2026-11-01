@@ -26,9 +26,12 @@ public sealed class PopupViewModel : ObservableObject
 {
     public delegate Task<ClaudeResult> RunClaude(ClaudeRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Like <see cref="RunClaude"/>, plus the answer so far while it streams in (on any thread).</summary>
+    public delegate Task<ClaudeResult> RunClaudeStreaming(ClaudeRequest request, Action<string> onPartialText, CancellationToken cancellationToken);
+
     private readonly string? _sourceText;
     private readonly AppSettings _settings;
-    private readonly RunClaude _run;
+    private readonly RunClaudeStreaming _run;
     private readonly Action<string> _copy;
     private CancellationTokenSource? _running;
     private PopupState _state;
@@ -41,7 +44,7 @@ public sealed class PopupViewModel : ObservableObject
 
     /// <param name="sourceText">The captured text; null when capturing failed.</param>
     /// <param name="captureMessage">Why capturing failed, shown instead of the actions.</param>
-    public PopupViewModel(string? sourceText, string? captureMessage, ActionConfig config, RunClaude run, Action<string> copy)
+    public PopupViewModel(string? sourceText, string? captureMessage, ActionConfig config, RunClaudeStreaming run, Action<string> copy)
     {
         _sourceText = sourceText;
         _settings = config.Settings;
@@ -162,6 +165,21 @@ public sealed class PopupViewModel : ObservableObject
         private set => Set(ref _resultText, value);
     }
 
+    private string _streamingText = "";
+
+    /// <summary>The answer so far while the call runs; only shown, the final result replaces it.</summary>
+    public string StreamingText
+    {
+        get => _streamingText;
+        private set
+        {
+            if (Set(ref _streamingText, value))
+                OnPropertyChanged(nameof(HasStreamingText));
+        }
+    }
+
+    public bool HasStreamingText => StreamingText.Length > 0;
+
     private string? _feedbackText;
 
     /// <summary>Feedback of the action (e.g. language coaching); shown, never copied or pasted.</summary>
@@ -253,9 +271,19 @@ public sealed class PopupViewModel : ObservableObject
         CurrentAction = item;
         ShowDetails = false;
         ReplaceError = null;
+        StreamingText = "";
         State = PopupState.Running;
         using var running = new CancellationTokenSource();
         _running = running;
+
+        // Partial text arrives on a worker thread; updates that come in after the call ended are dropped.
+        var context = SynchronizationContext.Current;
+        void OnPartialText(string text)
+        {
+            void Apply() { if (_running == running) StreamingText = text; }
+            if (context is null) Apply();
+            else context.Post(_ => Apply(), null);
+        }
 
         var definition = item.Definition;
         var request = new ClaudeRequest(
@@ -270,7 +298,7 @@ public sealed class PopupViewModel : ObservableObject
         var started = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            result = await _run(request, running.Token);
+            result = await _run(request, OnPartialText, running.Token);
         }
         catch (Exception ex)
         {
@@ -279,6 +307,7 @@ public sealed class PopupViewModel : ObservableObject
         finally
         {
             _running = null;
+            StreamingText = "";
         }
         RunCompleted?.Invoke(this, (definition.Id, started.Elapsed, result.Error));
 

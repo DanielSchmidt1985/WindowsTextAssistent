@@ -70,6 +70,9 @@
 
             <!-- Running -->
             <StackPanel Margin="0,8,0,0" Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}">
+                <!-- The answer while it is written; the result box below takes over when it is done -->
+                <TextBox x:Name="StreamBox" Style="{StaticResource ReadOnlyText}" Text="{Binding StreamingText, Mode=OneWay}" Margin="0,-4,0,8"
+                         MaxHeight="320" Visibility="{Binding HasStreamingText, Converter={StaticResource BoolToVisibility}}" />
                 <ProgressBar Style="{StaticResource BusyBar}" />
                 <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,0">
                     <Run Text="{Binding RunningLabel, Mode=OneWay}" /><Run Text="  Esc bricht ab" />

@@ -88,7 +88,9 @@ Text markieren und den **Haupt-Hotkey** drücken, Standard **Strg+C+C** (einstel
 Das Popup öffnet sich an der Maus.
 
 - Aktion per Klick oder mit den Tasten **1–9** starten. „Freitext“ fragt zuerst nach einer Anweisung (Enter führt aus).
-- Während Claude arbeitet, läuft ein Balken; **Esc** bricht ab (der CLI-Prozess wird beendet) und schließt.
+- Während Claude arbeitet, läuft ein Balken, und die Antwort erscheint schon beim Schreiben (Streaming, nur zur
+  Anzeige; „Ersetzen“ und „Kopieren“ gibt es erst mit dem fertigen Ergebnis). **Esc** bricht ab (der CLI-Prozess
+  wird beendet) und schließt.
 - **Kopieren** legt das Ergebnis in die Zwischenablage und schließt das Popup.
 - **Ersetzen** (oder **Enter**) setzt das Ergebnis anstelle der Markierung ins Quellfenster ein. Nur bei Aktionen mit
   `"replace": true`. Danach steht die Zwischenablage wieder so wie vor dem Ersetzen.
@@ -204,7 +206,7 @@ Optionen der Testroutine: `--model <alias>`, `--claude <pfad zur claude.exe>`.
 Geprüft mit Claude Code 2.1.240 (`claude --help`). Jeder Aufruf:
 
 ```
-claude -p --model <modell> --output-format json --system-prompt "<system-prompt>\n\nAufgabe:\n<aktionsprompt>"
+claude -p --model <modell> --output-format stream-json --verbose --include-partial-messages --system-prompt "<system-prompt>\n\nAufgabe:\n<aktionsprompt>"
        --no-session-persistence --strict-mcp-config --tools ""
 ```
 
@@ -217,9 +219,18 @@ claude -p --model <modell> --output-format json --system-prompt "<system-prompt>
   zeigen. `CLAUDE_CONFIG_DIR` bleibt erhalten. Ein Gateway in der `settings.json` von Claude Code wirkt weiterhin.
 - `--strict-mcp-config` ohne `--mcp-config` lädt keine MCP-Server (schnellerer Start, keine Werkzeuge).
 - `--bare` wird bewusst **nicht** genutzt: Es liest laut Hilfe nur `ANTHROPIC_API_KEY` und nie den Abo-Login.
-- Ausgabe: ein JSON-Objekt. Der Antworttext steht in `result`, Fehler erkennt das Tool an `is_error`,
-  `api_error_status` (401/403 = Login, 429 = Limit) und am Text in `result`. Beispiel eines echten Fehlerlaufs:
+- Ausgabe: eine JSON-Zeile pro Ereignis. Maßgeblich ist die letzte (`type: result`): Der Antworttext steht in
+  `result`, Fehler erkennt das Tool an `is_error`, `api_error_status` (401/403 = Login, 429 = Limit) und am Text in
+  `result`. Beispiel eines echten Fehlerlaufs:
   `{"is_error":true,"terminal_reason":"api_error","result":"Failed to authenticate: OAuth session expired and could not be refreshed", …}`
+- Streaming (`PartialTextReader`): Die Zeilen `type: stream_event` liefern die Antwort stückweise, normal als
+  `text_delta`, bei Aktionen mit Feedback als `input_json_delta` des Werkzeugs `StructuredOutput`. Aus dem noch
+  unvollständigen JSON wird das Feld `text` gelesen; das Feedback erscheint erst mit dem Ergebnis. Die
+  Teilstände sind nur Anzeige, ersetzt wird immer das fertige Ergebnis. In den Fehlerdetails fehlen die
+  `stream_event`-Zeilen, weil sie nur die Antwort wiederholen.
+- Gemessen (01.11.2026, `sonnet`, über `tools/ClaudeHotkey.CliCheck`): erster Text nach 2,3–2,6 s. Bei einer
+  Aktion mit Feedback war der Ergebnistext nach 2,8 s vollständig, die ganze Antwort erst nach 6,1 s; ohne
+  Streaming zeigte das Popup bis dahin nur den Balken. Den Start der CLI (etwa 1–2 s) spart Streaming nicht.
 
 Erster echter Lauf (31.10.2026, Modell `haiku`): Preflight „Abo aktiv“ (`authMethod=claude.ai`,
 `apiKeySource=none`) in 6,1 s, eine Korrektur in 6,0 s. Umlaute und Emojis kamen unverändert zurück.

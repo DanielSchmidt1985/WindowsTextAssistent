@@ -97,7 +97,10 @@ public sealed class ClaudeCli
         {
             "-p",
             "--model", request.Model,
-            "--output-format", "json",
+            // stream-json needs --verbose; partial messages let the popup show the text while it is written.
+            "--output-format", "stream-json",
+            "--verbose",
+            "--include-partial-messages",
             "--system-prompt", BuildSystemPrompt(request),
         };
         if (WantsFeedback(request))
@@ -133,15 +136,31 @@ public sealed class ClaudeCli
 
     public static string BuildStandardInput(string text) => $"<text>\n{text}\n</text>";
 
-    public async Task<ClaudeResult> RunAsync(ClaudeRequest request, CancellationToken cancellationToken = default)
+    public Task<ClaudeResult> RunAsync(ClaudeRequest request, CancellationToken cancellationToken = default) =>
+        RunAsync(request, null, cancellationToken);
+
+    /// <param name="onPartialText">
+    /// Gets the answer text so far whenever it grows (on a worker thread). Only for display: the
+    /// returned result is what counts.
+    /// </param>
+    public async Task<ClaudeResult> RunAsync(ClaudeRequest request, Action<string>? onPartialText, CancellationToken cancellationToken = default)
     {
-        var outcome = await RunCliAsync(BuildArguments(request), BuildStandardInput(request.Text), request.Timeout, cancellationToken)
+        Action<string>? onLine = null;
+        if (onPartialText is not null)
+        {
+            var reader = new PartialTextReader();
+            onLine = line => { if (reader.Feed(line) is { } text) onPartialText(text); };
+        }
+
+        var outcome = await RunCliAsync(BuildArguments(request), BuildStandardInput(request.Text), request.Timeout, cancellationToken, onLine)
             .ConfigureAwait(false);
         if (outcome.Error is { } error)
             return new ClaudeResult(error.Kind, null, error.Message, error.Details);
 
-        var output = outcome.Output!;
-        if (!TryParseResult(output.StandardOutput, out var parsed))
+        // Error details without the many partial-message lines, which only repeat the answer.
+        var output = outcome.Output! with { StandardOutput = WithoutStreamEvents(outcome.Output!.StandardOutput) };
+        var (_, parsed) = ParseStreamJson(output.StandardOutput);
+        if (parsed is null)
         {
             var details = CombineOutput(output);
             return Fail(Classify(details, null) ?? ClaudeErrorKind.Failed, details);
@@ -156,6 +175,9 @@ public sealed class ClaudeCli
             ? Fail(ClaudeErrorKind.EmptyResponse, CombineOutput(output))
             : new ClaudeResult(ClaudeErrorKind.None, text, null, null, feedback);
     }
+
+    internal static string WithoutStreamEvents(string stdout) =>
+        string.Join('\n', stdout.Split('\n').Where(line => !line.StartsWith("{\"type\":\"stream_event\"", StringComparison.Ordinal)));
 
     /// <summary>
     /// Text and feedback from a structured answer: "structured_output" first, then "result" as
@@ -249,7 +271,8 @@ public sealed class ClaudeCli
     private sealed record CliOutcome(ProcessResult? Output, CliError? Error);
 
     private async Task<CliOutcome> RunCliAsync(
-        IReadOnlyList<string> arguments, string? standardInput, TimeSpan timeout, CancellationToken cancellationToken)
+        IReadOnlyList<string> arguments, string? standardInput, TimeSpan timeout, CancellationToken cancellationToken,
+        Action<string>? onLine = null)
     {
         var executable = _locate();
         if (executable is null)
@@ -257,7 +280,7 @@ public sealed class ClaudeCli
 
         Directory.CreateDirectory(_workingDirectory);
         var (fileName, args, rawArgs) = executable.BuildCommand(arguments);
-        var request = new ProcessRequest(fileName, args, rawArgs, _workingDirectory, standardInput, RemovedEnvironmentVariables);
+        var request = new ProcessRequest(fileName, args, rawArgs, _workingDirectory, standardInput, RemovedEnvironmentVariables, onLine);
 
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(timeout);
@@ -285,21 +308,7 @@ public sealed class ClaudeCli
     /// <param name="StructuredText">"text" of "structured_output", only with --json-schema.</param>
     internal sealed record ParsedResult(bool IsError, string Result, int? ApiErrorStatus, string? StructuredText = null, string? StructuredFeedback = null);
 
-    /// <summary>Reads the single JSON object of <c>--output-format json</c>; the answer is in <c>result</c>.</summary>
-    internal static bool TryParseResult(string stdout, out ParsedResult parsed)
-    {
-        parsed = new ParsedResult(true, "", null);
-        try
-        {
-            using var document = JsonDocument.Parse(stdout.Trim());
-            return TryReadResult(document.RootElement, out parsed);
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
+    /// <summary>Reads the result line of stream-json output; the answer is in <c>result</c>.</summary>
     private static bool TryReadResult(JsonElement root, out ParsedResult parsed)
     {
         parsed = new ParsedResult(true, "", null);

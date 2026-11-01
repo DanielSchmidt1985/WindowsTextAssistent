@@ -47,7 +47,16 @@ var request = new ClaudeRequest(
 
 Console.WriteLine($"\nEingabe:    {text}");
 watch.Restart();
-var result = await cli.RunAsync(request);
+var firstPartial = TimeSpan.Zero;
+var partials = 0;
+var result = await cli.RunAsync(request, partial =>
+{
+    if (partials++ == 0)
+        firstPartial = watch.Elapsed;
+    Console.WriteLine($"  {watch.Elapsed.TotalSeconds,5:0.00} s  {partial.Length,5} Zeichen");
+});
+if (partials > 0)
+    Console.WriteLine($"Streaming:  erster Text nach {firstPartial.TotalSeconds:0.0} s, {partials} Teilstände");
 Console.WriteLine(result.Success
     ? $"Antwort:    {result.Text} ({watch.Elapsed.TotalSeconds:0.0} s)" + (result.Feedback is { } f ? $"\nFeedback:\n{f}" : feedback is null ? "" : "\nFeedback:   (leer)")
     : $"Fehler:     {result.Message}\n\nDetails:\n{result.Details}");

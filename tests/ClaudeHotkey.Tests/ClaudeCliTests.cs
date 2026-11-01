@@ -32,7 +32,7 @@ public class ClaudeCliTests
         Assert.Equal(Exe.Path, request.FileName);
         Assert.Null(request.RawArguments);
         Assert.Equal(
-            ["-p", "--model", "haiku", "--output-format", "json", "--system-prompt",
+            ["-p", "--model", "haiku", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--system-prompt",
              "Antworte nur mit dem Ergebnis.\n\nAufgabe:\nKorrigiere den Text.",
              "--no-session-persistence", "--strict-mcp-config", "--tools", ""],
             request.Arguments);
@@ -452,6 +452,54 @@ public class ClaudeCliTests
 
         Assert.Equal(ClaudeErrorKind.NotLoggedIn, result.Error);
         Assert.Single(runner.Requests);
+    }
+
+    private static string Delta(string text) =>
+        """{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"""
+        + System.Text.Json.JsonSerializer.Serialize(text) + "}}}";
+
+    [Fact]
+    public async Task Streamed_text_reaches_the_callback_before_the_result()
+    {
+        string[] lines = [Delta("Hallo "), Delta("Welt!"), ResultJson("Hallo Welt!")];
+        var (cli, _) = Create((request, _) =>
+        {
+            foreach (var line in lines)
+                request.StandardOutputLine?.Invoke(line);
+            return Ok(string.Join('\n', lines));
+        });
+        var partials = new List<string>();
+
+        var result = await cli.RunAsync(Request(), partials.Add);
+
+        Assert.Equal(["Hallo ", "Hallo Welt!"], partials);
+        Assert.Equal("Hallo Welt!", result.Text);
+    }
+
+    [Fact]
+    public async Task Error_details_leave_out_stream_events()
+    {
+        var (cli, _) = Create((_, _) => Ok(string.Join('\n', Delta("Teil"), ResultJson("Failed to authenticate", isError: true)), exitCode: 1));
+
+        var result = await cli.RunAsync(Request());
+
+        Assert.Equal(ClaudeErrorKind.NotLoggedIn, result.Error);
+        Assert.DoesNotContain("stream_event", result.Details);
+        Assert.Contains("Failed to authenticate", result.Details);
+    }
+
+    [Fact]
+    public async Task Real_runner_reports_stdout_lines_as_they_come()
+    {
+        var cmd = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe";
+        var lines = new List<string>();
+        var request = new ProcessRequest(cmd, ["/d", "/c", "echo eins&& echo zwei"], null, Path.GetTempPath(), null, [],
+            StandardOutputLine: lines.Add);
+
+        var result = await new ProcessRunner().RunAsync(request, CancellationToken.None);
+
+        Assert.Equal(["eins", "zwei"], lines);
+        Assert.Equal("eins\nzwei\n", result.StandardOutput);
     }
 
     private sealed class FakeRunner(Func<ProcessRequest, CancellationToken, Task<ProcessResult>> handler) : IProcessRunner

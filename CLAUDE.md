@@ -50,10 +50,11 @@ Flow of one use:
    Ctrl+C, read, restore.
 3. **Popup** (`Views/PopupWindow`, `ViewModels/PopupViewModel`) at the mouse (`Windows/ForegroundWindow`: placement
    in physical pixels, app is per-monitor DPI aware; activation via `AttachThreadInput`).
-4. **Claude** (`Claude/ClaudeCli`) — `claude -p --model … --output-format json --system-prompt "<system prompt>\n\nAufgabe:\n<action prompt>" --no-session-persistence --strict-mcp-config --tools ""`;
+4. **Claude** (`Claude/ClaudeCli`) — `claude -p --model … --output-format stream-json --verbose --include-partial-messages --system-prompt "<system prompt>\n\nAufgabe:\n<action prompt>" --no-session-persistence --strict-mcp-config --tools ""`;
    selected text only over stdin as `<text>…</text>`; empty temp working dir; API-key and Claude-Code session env
    vars removed. `--tools ""` must stay last (variadic). Actions with `feedback` add `--json-schema` and read
-   `structured_output` {text, feedback}. `IProcessRunner` is the test seam; `claude.cmd` goes through `cmd.exe` with
+   `structured_output` {text, feedback} from the final `type: result` line. `PartialTextReader` turns the
+   `stream_event` lines into the text so far (popup shows it while running; `RunClaudeStreaming`). `IProcessRunner` is the test seam; `claude.cmd` goes through `cmd.exe` with
    cross-spawn style `^` escaping.
 5. **Replace** (`Windows/TextReplacer`) — result into clipboard, re-activate source window, Ctrl+V, wait
    `pasteDelayMs`, restore the previous clipboard unless the user copied something meanwhile.
