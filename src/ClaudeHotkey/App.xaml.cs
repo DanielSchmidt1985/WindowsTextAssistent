@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using ClaudeHotkey.Core.Claude;
@@ -6,12 +7,14 @@ using ClaudeHotkey.Core.Clipboard;
 using ClaudeHotkey.Core.Config;
 using ClaudeHotkey.Core.Hotkeys;
 using ClaudeHotkey.Core.Input;
+using ClaudeHotkey.Core.Localization;
 using ClaudeHotkey.Core.Logging;
 using ClaudeHotkey.Core.Startup;
 using ClaudeHotkey.Core.Windows;
 using ClaudeHotkey.Themes;
 using ClaudeHotkey.ViewModels;
 using ClaudeHotkey.Views;
+using Microsoft.Win32;
 
 namespace ClaudeHotkey;
 
@@ -32,7 +35,7 @@ public partial class App : Application
     private bool _capturing;
 
     // Pieces of the tray status; see UpdateTrayStatus.
-    private string _claudeStatus = "Claude wird geprüft …";
+    private string _claudeStatus = "";
     private bool _claudeWarning;
     private string _hotkeyStatus = "";
     private bool _hotkeyWarning;
@@ -53,9 +56,19 @@ public partial class App : Application
             if (Directory.Exists(demoUi))
                 Directory.Delete(demoUi, recursive: true);
             _ui = new UiStateStore(demoUi);
-            if (e.Args is [_, _, var scaleArg, ..] && int.TryParse(scaleArg, out var demoScale))
-                _ui.Update(s => s.Scale = demoScale);
+            // Further arguments in any order: scale in percent, "dark"/"light", "de"/"en".
+            var demoTheme = ThemeSetting.System;
+            foreach (var arg in e.Args.Skip(2))
+            {
+                if (int.TryParse(arg, out var demoScale))
+                    _ui.Update(s => s.Scale = demoScale);
+                else if (arg is ThemeSetting.Dark or ThemeSetting.Light)
+                    demoTheme = arg;
+                else if (arg is Lang.German or Lang.English)
+                    Lang.Current = Lang.Resolve(arg, CultureInfo.CurrentUICulture);
+            }
             UiScale.Apply(_ui.Current.Scale);
+            ThemeManager.Apply(Resources, demoTheme, _config.Directory);
             ShowDemo(demoState);
             return;
         }
@@ -74,14 +87,22 @@ public partial class App : Application
         _log.Write("start");
         UiScale.Apply(_ui.Load().Scale);
 
+        // Language first: the tray menu, the messages and a first-start actions.json use it. A
+        // missing actions.json is created here in the Windows display language.
+        _config.Reload();
+        ApplyLanguage(_config.Current.Settings);
+        _claudeStatus = Lang.T("Claude wird geprüft …", "Checking Claude …");
+
         _tray = new TrayIcon();
         _tray.SettingsRequested += (_, _) => OpenSettings();
         _tray.OpenLogRequested += (_, _) => OpenLogFile();
         _tray.ExitRequested += (_, _) => Shutdown();
 
-        var themeProblems = ThemeOverrides.Apply(Resources, _config.Directory);
+        var themeProblems = ThemeManager.Apply(Resources, _config.Current.Settings.Theme, _config.Directory);
         if (themeProblems.Count > 0)
-            _tray.Notify("theme.json fehlerhaft", string.Join(Environment.NewLine, themeProblems), warning: true);
+            _tray.Notify(Lang.T("theme.json fehlerhaft", "theme.json is broken"), string.Join(Environment.NewLine, themeProblems), warning: true);
+        // "Wie Windows": follow when the user switches the Windows app mode.
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 
         ReloadConfig();
         var settings = _config.Current.Settings;
@@ -117,7 +138,7 @@ public partial class App : Application
     {
         var parts = new List<string> { _claudeStatus };
         if (_configWarning)
-            parts.Add("actions.json fehlerhaft");
+            parts.Add(Lang.T("actions.json fehlerhaft", "actions.json is broken"));
         if (_hotkeyStatus.Length > 0)
             parts.Add(_hotkeyStatus);
         _tray?.SetStatus(string.Join(" · ", parts), _claudeWarning || _hotkeyWarning || _configWarning);
@@ -151,10 +172,10 @@ public partial class App : Application
         _hotkeyTargets.Clear();
 
         var config = _config.Current;
-        var wanted = new List<(string Text, string? ActionId, string Name)> { (config.Settings.MainHotkey, null, "Haupt-Hotkey") };
+        var wanted = new List<(string Text, string? ActionId, string Name)> { (config.Settings.MainHotkey, null, Lang.T("Haupt-Hotkey", "main hotkey")) };
         wanted.AddRange(config.EnabledActions
             .Where(a => !string.IsNullOrWhiteSpace(a.Hotkey))
-            .Select(a => (a.Hotkey!, (string?)a.Id, $"„{a.Label}“")));
+            .Select(a => (a.Hotkey!, (string?)a.Id, Lang.T($"„{a.Label}“", $"\"{a.Label}\""))));
 
         var taken = new List<string>();
         var doublePresses = new List<HotkeyGesture>();
@@ -177,13 +198,14 @@ public partial class App : Application
             _hook.Gestures = doublePresses;
 
         _hotkeyWarning = taken.Count > 0;
-        _hotkeyStatus = _hotkeyWarning ? $"belegt: {string.Join(", ", taken)}" : "";
+        _hotkeyStatus = _hotkeyWarning ? Lang.T($"belegt: {string.Join(", ", taken)}", $"taken: {string.Join(", ", taken)}") : "";
         UpdateTrayStatus();
         if (_hotkeyWarning && notifyWhenTaken)
         {
             _log.Write("hotkey", code: "Taken");
-            _tray?.Notify("Hotkey belegt",
-                $"Von einem anderen Programm belegt: {string.Join(", ", taken)}. In den Einstellungen eine andere Kombination wählen.",
+            _tray?.Notify(Lang.T("Hotkey belegt", "Hotkey taken"),
+                Lang.T($"Von einem anderen Programm belegt: {string.Join(", ", taken)}. In den Einstellungen eine andere Kombination wählen.",
+                    $"Taken by another program: {string.Join(", ", taken)}. Choose another combination in the settings."),
                 warning: true);
         }
     }
@@ -191,9 +213,29 @@ public partial class App : Application
     /// <summary>Puts a newly saved or reloaded configuration into effect without a restart.</summary>
     private void ApplyConfig(bool notify)
     {
+        var settings = _config.Current.Settings;
         if (_hook is not null)
-            _hook.DoublePressMilliseconds = _config.Current.Settings.DoubleCopyMs;
+            _hook.DoublePressMilliseconds = settings.DoubleCopyMs;
+        ApplyLanguage(settings);
+        ThemeManager.Apply(Resources, settings.Theme, _config.Directory);
         RegisterHotkeys(notify);
+    }
+
+    /// <summary>Takes effect for the tray menu at once and for every window opened afterwards.</summary>
+    private void ApplyLanguage(AppSettings settings)
+    {
+        var language = Lang.Resolve(settings.Language, CultureInfo.CurrentUICulture);
+        if (language == Lang.Current)
+            return;
+        Lang.Current = language;
+        _tray?.UpdateTexts();
+    }
+
+    private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
+    {
+        // Switching the Windows app mode arrives as "General"; other categories are not about colours.
+        if (e.Category == UserPreferenceCategory.General)
+            Dispatcher.BeginInvoke(() => ThemeManager.Apply(Resources, _config.Current.Settings.Theme, _config.Directory));
     }
 
     /// <summary>Reads actions.json again if it changed; a broken file keeps the last valid one.</summary>
@@ -210,8 +252,9 @@ public partial class App : Application
         if (!ok && !wasBroken)
         {
             _log.Write("config", code: "Invalid");
-            _tray?.Notify("actions.json fehlerhaft",
-                $"Die letzte gültige Konfiguration bleibt aktiv.{Environment.NewLine}{string.Join(Environment.NewLine, _config.LoadErrors.Take(3))}",
+            _tray?.Notify(Lang.T("actions.json fehlerhaft", "actions.json is broken"),
+                Lang.T("Die letzte gültige Konfiguration bleibt aktiv.", "The last valid configuration stays in effect.")
+                    + Environment.NewLine + string.Join(Environment.NewLine, _config.LoadErrors.Take(3)),
                 warning: true);
         }
     }
@@ -274,7 +317,7 @@ public partial class App : Application
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
-            _tray?.Notify("Autostart", $"Der Autostart ließ sich nicht ändern: {ex.Message}", warning: true);
+            _tray?.Notify("Autostart", Lang.T($"Der Autostart ließ sich nicht ändern: {ex.Message}", $"Autostart could not be changed: {ex.Message}"), warning: true);
         }
     }
 
@@ -353,22 +396,19 @@ public partial class App : Application
         popup.Show();
     }
 
-    private static string ReplaceCode(string? message) => message switch
-    {
-        TextReplacer.WindowGoneMessage => "WindowGone",
-        TextReplacer.ActivateFailedMessage => "ActivateFailed",
-        TextReplacer.KeysHeldMessage => "KeysHeld",
-        _ => "Failed",
-    };
+    private static string ReplaceCode(string? message) =>
+        message == TextReplacer.WindowGoneMessage ? "WindowGone"
+        : message == TextReplacer.ActivateFailedMessage ? "ActivateFailed"
+        : message == TextReplacer.KeysHeldMessage ? "KeysHeld"
+        : "Failed";
 
     /// <summary>
     /// Opens the popup in one state with sample text and a simulated Claude answer, without hooks
-    /// or CLI calls: <c>ClaudeHotkey.exe --demo choose|input|running|result|error|nocapture|replacefail</c>.
+    /// or CLI calls: <c>ClaudeHotkey.exe --demo choose|input|running|result|error|nocapture|replacefail [scale] [dark|light] [de|en]</c>.
     /// For checking the design against the reference screenshot.
     /// </summary>
     private void ShowDemo(string state)
     {
-        ThemeOverrides.Apply(Resources, _config.Directory);
         if (state.StartsWith("settings", StringComparison.Ordinal))
         {
             // Works on a fresh copy in %TEMP%, never on the real actions.json.
@@ -380,7 +420,8 @@ public partial class App : Application
             PopupViewModel.RunClaude fake = async (request, token) =>
             {
                 await Task.Delay(400, token);
-                return new ClaudeResult(ClaudeErrorKind.None, "Das ist ein kurzer Beispieltext, mit dem sich die Aktion ausprobieren lässt.", null, null);
+                return new ClaudeResult(ClaudeErrorKind.None, Lang.T("Das ist ein kurzer Beispieltext, mit dem sich die Aktion ausprobieren lässt.",
+                    "This is a short sample text with a mistake, to try the action."), null, null);
             };
             var settingsViewModel = new SettingsViewModel(demoStore, fake, _ui);
             var settingsWindow = new SettingsWindow(settingsViewModel, null, StepScale, _ui.Current.Scale);
@@ -405,7 +446,12 @@ public partial class App : Application
             return;
         }
 
-        const string sample = "Hallo zusammen, anbei die Unterlagen für das Meeting morgen. Bitte schaut sie euch vorher kurtz an und gebt mir bescheid, falls etwas fehlt.";
+        var sample = Lang.T(
+            "Hallo zusammen, anbei die Unterlagen für das Meeting morgen. Bitte schaut sie euch vorher kurtz an und gebt mir bescheid, falls etwas fehlt.",
+            "Hi all, attached are the documents for tomorows meeting. Please have a look at them befor and let me know if anything is missing.");
+        var corrected = Lang.T(
+            "Hallo zusammen,\n\nanbei die Unterlagen für das Meeting morgen. Bitte schaut sie euch vorher kurz an und gebt mir Bescheid, falls etwas fehlt.",
+            "Hi all,\n\nattached are the documents for tomorrow's meeting. Please have a look at them beforehand and let me know if anything is missing.");
         var config = ActionConfig.Parse(DefaultConfig.Json());
 
         PopupViewModel.RunClaudeStreaming run = state switch
@@ -413,7 +459,8 @@ public partial class App : Application
             // Streams the first half of a sample answer, then keeps running until Esc.
             "running" => async (_, onPartialText, token) =>
             {
-                var words = "Hallo zusammen, anbei die Unterlagen für das Meeting morgen. Bitte schaut".Split(' ');
+                var words = corrected.Replace("\n", " ").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                words = words[..(words.Length / 2)];
                 for (var i = 1; i <= words.Length; i++)
                 {
                     await Task.Delay(120, token);
@@ -427,9 +474,13 @@ public partial class App : Application
                 await Task.Delay(300);
                 return new ClaudeResult(ClaudeErrorKind.None,
                     "I would like to schedule a meeting with you tomorrow.", null, null,
-                    "• „make a meeting“ → „schedule a meeting“: Termine werden „scheduled“ oder „arranged“.\n" +
-                    "• „I want make“ → „I would like to“: nach „want“ steht „to“, „would like“ klingt höflicher.\n" +
-                    "• „tomorow“ → „tomorrow“: zwei r, ein w.");
+                    Lang.T(
+                        "• „make a meeting“ → „schedule a meeting“: Termine werden „scheduled“ oder „arranged“.\n" +
+                        "• „I want make“ → „I would like to“: nach „want“ steht „to“, „would like“ klingt höflicher.\n" +
+                        "• „tomorow“ → „tomorrow“: zwei r, ein w.",
+                        "• \"make a meeting\" → \"schedule a meeting\": meetings are \"scheduled\" or \"arranged\".\n" +
+                        "• \"I want make\" → \"I would like to\": \"want\" is followed by \"to\", \"would like\" sounds more polite.\n" +
+                        "• \"tomorow\" → \"tomorrow\": two r, one w."));
             },
             "error" => (_, _, _) => Task.FromResult(new ClaudeResult(ClaudeErrorKind.NotLoggedIn, null,
                 ClaudeCli.MessageFor(ClaudeErrorKind.NotLoggedIn),
@@ -437,9 +488,7 @@ public partial class App : Application
             _ => async (_, _, _) =>
             {
                 await Task.Delay(300);
-                return new ClaudeResult(ClaudeErrorKind.None,
-                    "Hallo zusammen,\n\nanbei die Unterlagen für das Meeting morgen. Bitte schaut sie euch vorher kurz an und gebt mir Bescheid, falls etwas fehlt.",
-                    null, null);
+                return new ClaudeResult(ClaudeErrorKind.None, corrected, null, null);
             },
         };
 
@@ -469,6 +518,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _popup?.Close();
         _settings?.Close();
         _hook?.Dispose();

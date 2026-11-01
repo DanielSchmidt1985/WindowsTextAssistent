@@ -1,9 +1,10 @@
 using ClaudeHotkey.Core.Input;
+using ClaudeHotkey.Core.Localization;
 
 namespace ClaudeHotkey.Core.Clipboard;
 
 /// <param name="Text">The selected text, or null when none could be captured.</param>
-/// <param name="Message">German message for the user when <paramref name="Text"/> is null.</param>
+/// <param name="Message">Message for the user (UI language) when <paramref name="Text"/> is null.</param>
 public sealed record CaptureResult(string? Text, string? Message)
 {
     public bool Success => Text is not null;
@@ -37,8 +38,10 @@ public sealed class TextCapture(IClipboard clipboard, IKeyboardInput keyboard)
     private static readonly TimeSpan ModifierTimeout = TimeSpan.FromSeconds(2);
     private const int VirtualKeyC = 0x43;
 
-    public const string NoTextMessage = "Kein markierter Text gefunden. Das Programm gibt den Text eventuell nicht per Strg+C heraus.";
-    public const string KeysHeldMessage = "Tasten des Hotkeys wurden nicht losgelassen.";
+    public static string NoTextMessage => Lang.T(
+        "Kein markierter Text gefunden. Das Programm gibt den Text eventuell nicht per Strg+C heraus.",
+        "No selected text found. The program may not hand out its text via Ctrl+C.");
+    public static string KeysHeldMessage => Lang.T("Tasten des Hotkeys wurden nicht losgelassen.", "The hotkey keys were not released.");
 
     /// <summary>
     /// After Ctrl+C+C: the user copied on purpose, so the text stays in the clipboard (as with

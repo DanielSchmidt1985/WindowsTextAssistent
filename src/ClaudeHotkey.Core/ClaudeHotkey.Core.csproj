@@ -10,6 +10,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="ClaudeHotkey.Tests" />
     <EmbeddedResource Include="Config\actions.default.json" LogicalName="ClaudeHotkey.Core.Config.actions.default.json" />
+    <!-- Not "*.en.json": MSBuild would take "en" as a culture and move the file into a satellite assembly. -->
+    <EmbeddedResource Include="Config\actions.default-en.json" LogicalName="ClaudeHotkey.Core.Config.actions.default-en.json" />
   </ItemGroup>
 
   <ItemGroup>

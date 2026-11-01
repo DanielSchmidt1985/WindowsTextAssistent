@@ -3,11 +3,12 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
+using ClaudeHotkey.Core.Localization;
 
 namespace ClaudeHotkey.Views;
 
 /// <summary>
-/// Tray icon with status (tooltip, warning icon) and the menu: Einstellungen, Logdatei, Beenden.
+/// Tray icon with status (tooltip, warning icon) and the menu: settings, log file, exit.
 /// Double click opens the settings.
 /// </summary>
 public sealed class TrayIcon : IDisposable
@@ -17,15 +18,19 @@ public sealed class TrayIcon : IDisposable
 
     private readonly TaskbarIcon _icon;
     private readonly MenuItem _statusItem;
+    private readonly MenuItem _settingsItem;
+    private readonly MenuItem _logItem;
+    private readonly MenuItem _exitItem;
 
     public TrayIcon()
     {
         _statusItem = new MenuItem { IsEnabled = false };
-        var settings = new MenuItem { Header = "Einstellungen …", FontWeight = FontWeights.SemiBold };
+        var settings = _settingsItem = new MenuItem { FontWeight = FontWeights.SemiBold };
         settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
-        var log = new MenuItem { Header = "Logdatei öffnen" };
+        var log = _logItem = new MenuItem();
         log.Click += (_, _) => OpenLogRequested?.Invoke(this, EventArgs.Empty);
-        var exit = new MenuItem { Header = "Beenden" };
+        var exit = _exitItem = new MenuItem();
+        UpdateTexts();
         exit.Click += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
         _icon = new TaskbarIcon
@@ -38,6 +43,14 @@ public sealed class TrayIcon : IDisposable
         // false: no Windows efficiency mode. It throttles the process, and a throttled low-level
         // keyboard hook answers too slowly and gets dropped by Windows.
         _icon.ForceCreate(false);
+    }
+
+    /// <summary>Menu texts in the current UI language; called again after the language changed.</summary>
+    public void UpdateTexts()
+    {
+        _settingsItem.Header = Lang.T("Einstellungen …", "Settings …");
+        _logItem.Header = Lang.T("Logdatei öffnen", "Open log file");
+        _exitItem.Header = Lang.T("Beenden", "Exit");
     }
 
     public event EventHandler? SettingsRequested;

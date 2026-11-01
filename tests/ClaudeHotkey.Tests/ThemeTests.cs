@@ -37,10 +37,42 @@ public class ThemeTests
         Dispatcher.PushFrame(frame);
     }
 
-    private static ResourceDictionary LoadTheme()
+    private static string PalettePath(string name) => Path.Combine(Path.GetDirectoryName(ThemePath())!, $"Colors.{name}.xaml");
+
+    private static ResourceDictionary Load(string path)
     {
-        using var stream = File.OpenRead(ThemePath());
+        using var stream = File.OpenRead(path);
         return (ResourceDictionary)XamlReader.Load(stream);
+    }
+
+    /// <summary>Styles plus one palette, as in App.xaml.</summary>
+    private static ResourceDictionary LoadTheme(string palette = "Dark")
+    {
+        var theme = Load(ThemePath());
+        theme.MergedDictionaries.Add(Load(PalettePath(palette)));
+        return theme;
+    }
+
+    [Fact]
+    public void Both_palettes_define_the_same_tokens()
+    {
+        OnSta(() =>
+        {
+            var dark = Load(PalettePath("Dark")).Keys.Cast<string>().Order().ToList();
+            var light = Load(PalettePath("Light")).Keys.Cast<string>().Order().ToList();
+
+            Assert.Equal(dark, light);
+            Assert.All(dark, key => Assert.EndsWith("Brush", key)); // theme.json only accepts *Brush tokens
+        });
+    }
+
+    [Fact]
+    public void Styles_use_no_colour_that_is_not_a_token()
+    {
+        // Every colour must come from the palette, otherwise it would not switch with the theme.
+        var styles = File.ReadAllText(ThemePath());
+        Assert.DoesNotMatch(@"StaticResource \w+Brush", styles);
+        Assert.DoesNotMatch(@"Color=""#", styles);
     }
 
     private static Window OffScreenWindow(ResourceDictionary theme, UIElement content) => new()
@@ -99,12 +131,14 @@ public class ThemeTests
         });
     }
 
-    [Fact]
-    public void Every_control_style_applies_without_errors()
+    [Theory]
+    [InlineData("Dark")]
+    [InlineData("Light")]
+    public void Every_control_style_applies_without_errors(string palette)
     {
         OnSta(() =>
         {
-            var theme = LoadTheme();
+            var theme = LoadTheme(palette);
             var panel = new StackPanel
             {
                 Children =

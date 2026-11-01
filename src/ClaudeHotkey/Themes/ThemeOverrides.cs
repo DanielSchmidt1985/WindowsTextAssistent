@@ -2,12 +2,14 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
+using ClaudeHotkey.Core.Localization;
 
 namespace ClaudeHotkey.Themes;
 
 /// <summary>
 /// Optional %APPDATA%\ClaudeHotkey\theme.json, e.g. <c>{ "AccentBrush": "#3794FF" }</c>. Each entry
-/// replaces one *Brush token of Theme.Neptun.xaml at runtime, so the look can be tuned without a rebuild.
+/// replaces one *Brush token of the active palette (Colors.Dark/Light.xaml) at runtime, so the look
+/// can be tuned without a rebuild. ThemeManager applies it again after every palette switch.
 /// </summary>
 public static class ThemeOverrides
 {
@@ -28,7 +30,7 @@ public static class ThemeOverrides
         }
         catch (Exception ex) when (ex is JsonException or IOException)
         {
-            return [$"theme.json konnte nicht gelesen werden: {ex.Message}"];
+            return [Lang.T($"theme.json konnte nicht gelesen werden: {ex.Message}", $"theme.json could not be read: {ex.Message}")];
         }
 
         var problems = new List<string>();
@@ -37,7 +39,7 @@ public static class ThemeOverrides
             // The indexer also searches merged dictionaries; Contains would not.
             if (!key.EndsWith("Brush", StringComparison.Ordinal) || resources[key] is not SolidColorBrush)
             {
-                problems.Add($"theme.json: unbekanntes Token „{key}“.");
+                problems.Add(Lang.T($"theme.json: unbekanntes Token „{key}“.", $"theme.json: unknown token \"{key}\"."));
                 continue;
             }
             try
@@ -48,7 +50,7 @@ public static class ThemeOverrides
             }
             catch (FormatException)
             {
-                problems.Add($"theme.json: „{value}“ ist keine Farbe (Token {key}).");
+                problems.Add(Lang.T($"theme.json: „{value}“ ist keine Farbe (Token {key}).", $"theme.json: \"{value}\" is not a colour (token {key})."));
             }
         }
         return problems;

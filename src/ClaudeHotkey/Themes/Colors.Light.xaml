@@ -1,0 +1,15 @@
+<!-- Light palette, same keys as Colors.Dark.xaml. Text colours keep at least 4.5:1 contrast on Bg and Surface. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="BgBrush" Color="#F8F8F8" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#C8C8C8" />
+    <SolidColorBrush x:Key="TextBrush" Color="#1E1E1E" />
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#5F5F5F" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#0078D4" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#005A9E" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#C4314B" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#EDEDED" />
+    <SolidColorBrush x:Key="PressedBrush" Color="#E0E0E0" />
+    <SolidColorBrush x:Key="SelectionBrush" Color="#CCE4F7" />
+</ResourceDictionary>

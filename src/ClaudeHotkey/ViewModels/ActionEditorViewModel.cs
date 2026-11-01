@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using ClaudeHotkey.Core.Claude;
 using ClaudeHotkey.Core.Config;
+using ClaudeHotkey.Core.Localization;
 
 namespace ClaudeHotkey.ViewModels;
 
@@ -21,7 +22,8 @@ public sealed class ActionEditorViewModel : ObservableObject
     private string _testFeedback = "";
     private bool _enabled;
     private bool _isNew;
-    private string _testText = "Das ist ein kurtzer Beispieltext, mit dem sich die Aktion ausprobieren lässt.";
+    private string _testText = Lang.T("Das ist ein kurtzer Beispieltext, mit dem sich die Aktion ausprobieren lässt.",
+        "This is a short sample text with a mistak, to try the action.");
     private string _testInput = "";
     private string _testResult = "";
     private string _testError = "";
@@ -126,7 +128,8 @@ public sealed class ActionEditorViewModel : ObservableObject
     }
 
     /// <summary>Text in the list: label, marked when inactive.</summary>
-    public string DisplayLabel => (string.IsNullOrWhiteSpace(Label) ? "(ohne Namen)" : Label) + (Enabled ? "" : "  (inaktiv)");
+    public string DisplayLabel => (string.IsNullOrWhiteSpace(Label) ? Lang.T("(ohne Namen)", "(no name)") : Label)
+        + (Enabled ? "" : Lang.T("  (inaktiv)", "  (inactive)"));
 
     /// <summary>Called after saving: from now on the id stays as it is.</summary>
     public void MarkSaved() => _isNew = false;

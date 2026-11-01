@@ -124,7 +124,8 @@ Der Dialog schreibt dieselbe `actions.json`, die sich auch von Hand bearbeiten l
 - **Testen:** Beispieltext (und bei „Eingabefeld im Popup“ die Eingabe) eintragen; die Aktion läuft mit den noch nicht
   gespeicherten Werten, auch mit dem geänderten System-Prompt aus „Allgemein“.
 - **Allgemein:** Haupt-Hotkey, Zeitfenster für Doppeldruck, Standardmodell, Timeout, Wartezeit beim Einfügen,
-  Pfad zur CLI, System-Prompt, Autostart.
+  Pfad zur CLI, System-Prompt, Autostart. Unter „Darstellung“: Farbschema (Wie Windows/Dunkel/Hell), Sprache
+  (Wie Windows/Deutsch/English), Skalierung, Popup-Breite.
 - **Speichern** (oder Strg+S) prüft alles, schreibt atomar und wirkt sofort, auch für Hotkeys. Fehler stehen rot am
   Feld, Aktionen mit Fehlern haben einen roten Punkt in der Liste, und die Datei bleibt dann unverändert.
 - **Schließen** mit ungespeicherten Änderungen fragt nach.
@@ -135,7 +136,9 @@ Hotkeys.
 ## Konfiguration
 
 `%APPDATA%\ClaudeHotkey\actions.json` entsteht beim ersten Start aus `src/ClaudeHotkey.Core/Config/actions.default.json`
-(eingebettet in die DLL). Die Datei wird vor jedem Popup neu gelesen, wenn sie sich geändert hat; alle Änderungen
+(eingebettet in die DLL), bei englischer Windows-Anzeigesprache aus `actions.default-en.json` (gleiche Aktionen,
+Hotkeys und Modelle, englische Namen und Prompts; nicht `*.en.json`, sonst legt MSBuild sie in eine
+Satellitenassembly). Die Datei wird vor jedem Popup neu gelesen, wenn sie sich geändert hat; alle Änderungen
 gelten ohne Neustart. Eine vorhandene `actions.json` wird bei einem Update nie überschrieben.
 
 Der mitgelieferte Standard ist die eigene Einrichtung des Autors (ab 1.0.1): Hotkeys Strg+X+X (Übersetzen),
@@ -151,6 +154,20 @@ wo es vom Standardmodell abweicht), Werte aus `ui.json` in `UiState.DefaultScale
 - Ist die Datei fehlerhaft, bleibt die zuletzt gültige Konfiguration aktiv; das Tray meldet die Fehler.
 - Zusätzlich zum Plan: `settings.autostart`, `settings.claudePath` und pro Aktion `hotkey` und `enabled`
   (für den Einstellungsdialog). `enabled: false` blendet eine Aktion im Popup aus.
+- `settings.language`: `system` (Standard, Windows-Anzeigesprache), `de` oder `en`. `settings.theme`: `system`
+  (Standard, App-Modus von Windows), `dark` oder `light`. Ältere Dateien ohne diese Felder folgen Windows.
+
+### Sprache
+
+Deutsch und Englisch. „Wie Windows“ nimmt Deutsch bei deutscher Anzeigesprache (`CurrentUICulture`), sonst
+Englisch. Die Texte stehen paarweise im Code (`Lang.T("Abbrechen", "Cancel")`, `Core/Localization/Lang.cs`), die
+der Fenster gesammelt in `src/ClaudeHotkey/Localization/Ui.cs` und in XAML als `{x:Static l:Ui.…}`. Bei nur zwei
+Sprachen ist das übersichtlicher als resx-Dateien und braucht keine Satellitenassemblies in der einzelnen exe.
+Eine geänderte Sprache gilt sofort für das Tray-Menü und für jedes danach geöffnete Fenster; ein offener
+Einstellungsdialog bleibt in der alten Sprache, bis er neu geöffnet wird. Auch der Rahmen um den Aktionsprompt
+(„Aufgabe:“/„Task:“, Antwortformat bei Feedback) folgt der Sprache. Die Namen und Prompts der eigenen Aktionen
+bleiben, wie sie in `actions.json` stehen. Die Tests laufen immer auf Deutsch (`TestSetup.cs`), unabhängig von der
+Sprache des Rechners.
 
 ### Darstellung (ui.json)
 
@@ -166,12 +183,20 @@ bei jeder Änderung kommt deshalb eine neue hinein, und die Fenster folgen per `
 
 ### Design anpassen
 
-Alle Farben stehen als Token in `src/ClaudeHotkey/Themes/Theme.Neptun.xaml`. Ohne Neubau lassen sie sich in
-`%APPDATA%\ClaudeHotkey\theme.json` überschreiben, z. B. `{ "AccentBrush": "#3794FF" }`. Neben den Tokens aus dem
-Plan gibt es `HoverBrush`, `PressedBrush` und `SelectionBrush`.
+Die Styles stehen in `src/ClaudeHotkey/Themes/Theme.Neptun.xaml`, die Farben als Token in zwei Paletten:
+`Colors.Dark.xaml` und `Colors.Light.xaml` (gleiche Schlüssel, ein Test prüft das). `ThemeManager` kopiert die
+gewählte Palette in die App-Ressourcen; weil alle Fenster die Farben per `DynamicResource` binden, wechseln offene
+Fenster sofort mit, die Titelleiste der Einstellungen ebenso (`ThemedTitleBar`). Bei „Wie Windows“ liest die App
+`AppsUseLightTheme` unter `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize` und folgt einem
+Umschalten in Windows über `SystemEvents.UserPreferenceChanged` (Kategorie `General`).
 
-Zum Vergleichen mit dem Referenz-Screenshot öffnet `ClaudeHotkey.exe --demo <zustand>` das Popup mit Beispieltext,
-ohne Hook und ohne Claude-Aufruf. Zustände: `choose`, `input`, `running`, `result`, `error`, `nocapture`,
+Ohne Neubau lassen sich einzelne Token in `%APPDATA%\ClaudeHotkey\theme.json` überschreiben, z. B.
+`{ "AccentBrush": "#3794FF" }`. Das gilt für beide Paletten und wird nach jedem Wechsel neu angewendet. Neben den
+Tokens aus dem Plan gibt es `HoverBrush`, `PressedBrush` und `SelectionBrush`.
+
+Zum Vergleichen mit dem Referenz-Screenshot öffnet `ClaudeHotkey.exe --demo <zustand> [skalierung] [dark|light] [de|en]`
+das Popup mit Beispieltext, ohne Hook und ohne Claude-Aufruf (Reihenfolge der Zusätze beliebig, z. B.
+`--demo result light en`). Zustände: `choose`, `input`, `running`, `result`, `error`, `nocapture`,
 `replacefail`, `feedback`. Den Einstellungsdialog zeigen `settings`, `settings-general`, `settings-errors` und `settings-test`;
 sie arbeiten auf einer Kopie in `%TEMP%\ClaudeHotkey-demo`, nie auf der echten `actions.json`.
 

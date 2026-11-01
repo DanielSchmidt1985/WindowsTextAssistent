@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using ClaudeHotkey.Core.Claude;
 using ClaudeHotkey.Core.Config;
+using ClaudeHotkey.Core.Localization;
 
 namespace ClaudeHotkey.ViewModels;
 
@@ -18,7 +19,7 @@ public enum PopupState
 public sealed record ActionItem(ActionDefinition Definition, string Shortcut)
 {
     public string Label => Definition.Label;
-    public string ToolTip => Shortcut.Length > 0 ? $"Taste {Shortcut}" : Definition.Label;
+    public string ToolTip => Shortcut.Length > 0 ? Lang.T($"Taste {Shortcut}", $"Key {Shortcut}") : Definition.Label;
 }
 
 /// <summary>State of one popup: the captured text, the action buttons and the Claude call.</summary>
@@ -69,7 +70,7 @@ public sealed class PopupViewModel : ObservableObject
 
         if (sourceText is null)
         {
-            _errorMessage = captureMessage ?? "Kein Text übernommen.";
+            _errorMessage = captureMessage ?? Lang.T("Kein Text übernommen.", "No text taken over.");
             _state = PopupState.Error;
         }
     }
@@ -105,7 +106,7 @@ public sealed class PopupViewModel : ObservableObject
 
     public bool HasSource => _sourceText is not null;
 
-    public string SourceInfo => _sourceText is null ? "" : $"{_sourceText.Length} Zeichen";
+    public string SourceInfo => _sourceText is null ? "" : Lang.T($"{_sourceText.Length} Zeichen", $"{_sourceText.Length} characters");
 
     /// <summary>Selected text on one line, for the header.</summary>
     public string SourcePreview => _sourceText is null ? "" : string.Join(' ', _sourceText.Split((char[])['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();

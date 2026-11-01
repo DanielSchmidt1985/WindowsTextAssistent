@@ -6,6 +6,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <!-- Start palette; ThemeManager replaces the tokens with the chosen one at startup -->
+                <ResourceDictionary Source="Themes/Colors.Dark.xaml" />
                 <ResourceDictionary Source="Themes/Theme.Neptun.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />

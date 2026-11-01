@@ -4,6 +4,8 @@ using System.IO;
 using System.Windows.Input;
 using ClaudeHotkey.Core.Claude;
 using ClaudeHotkey.Core.Config;
+using ClaudeHotkey.Core.Localization;
+using ClaudeHotkey.Localization;
 
 namespace ClaudeHotkey.ViewModels;
 
@@ -27,6 +29,8 @@ public sealed class SettingsViewModel : ObservableObject
     private string _systemPrompt = "";
     private bool _autostart;
     private string _claudePath = "";
+    private string _theme = ThemeSetting.System;
+    private string _language = Lang.System;
     private string _status = "";
     private bool _statusIsError;
     private readonly UiStateStore _ui;
@@ -54,7 +58,8 @@ public sealed class SettingsViewModel : ObservableObject
         SaveCommand = new RelayCommand(() => Save());
 
         if (store.LoadErrors.Count > 0)
-            SetStatus("actions.json ist fehlerhaft. Angezeigt wird die letzte gültige Konfiguration; Speichern überschreibt die Datei.", isError: true);
+            SetStatus(Lang.T("actions.json ist fehlerhaft. Angezeigt wird die letzte gültige Konfiguration; Speichern überschreibt die Datei.",
+                "actions.json is broken. Shown is the last valid configuration; saving overwrites the file."), isError: true);
     }
 
     /// <summary>Raised after a successful save with the configuration now in effect.</summary>
@@ -84,6 +89,19 @@ public sealed class SettingsViewModel : ObservableObject
     public string SystemPrompt { get => _systemPrompt; set => Set(ref _systemPrompt, value); }
     public bool Autostart { get => _autostart; set => Set(ref _autostart, value); }
     public string ClaudePath { get => _claudePath; set => Set(ref _claudePath, value); }
+
+    /// <summary>settings.theme: "system", "dark" or "light".</summary>
+    public string Theme { get => _theme; set => Set(ref _theme, value); }
+
+    /// <summary>settings.language: "system", "de" or "en".</summary>
+    public string Language { get => _language; set => Set(ref _language, value); }
+
+    public IReadOnlyList<Choice> ThemeChoices { get; } =
+        [new(ThemeSetting.System, Ui.LikeWindows), new(ThemeSetting.Dark, Ui.Dark), new(ThemeSetting.Light, Ui.Light)];
+
+    // Language names stay in their own language, so they can be found in either UI language.
+    public IReadOnlyList<Choice> LanguageChoices { get; } =
+        [new(Lang.System, Ui.LikeWindows), new(Lang.German, "Deutsch"), new(Lang.English, "English")];
 
     /// <summary>Scale of text and controls in percent (ui.json).</summary>
     public string Scale { get => _scale; set => Set(ref _scale, value); }
@@ -161,7 +179,7 @@ public sealed class SettingsViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            SetStatus($"Speichern fehlgeschlagen: {ex.Message}", isError: true);
+            SetStatus(Lang.T($"Speichern fehlgeschlagen: {ex.Message}", $"Saving failed: {ex.Message}"), isError: true);
             return false;
         }
         LoadUi(_ui.Update(s =>
@@ -174,7 +192,8 @@ public sealed class SettingsViewModel : ObservableObject
         foreach (var action in Actions)
             action.MarkSaved();
         _savedJson = BuildJsonOrEmpty();
-        SetStatus($"Gespeichert um {DateTime.Now:HH:mm:ss}. Die Änderungen gelten sofort.", isError: false);
+        SetStatus(Lang.T($"Gespeichert um {DateTime.Now:HH:mm:ss}. Die Änderungen gelten sofort.",
+            $"Saved at {DateTime.Now:HH:mm:ss}. The changes apply right away."), isError: false);
         Saved?.Invoke(this, _store.Current);
         return true;
     }
@@ -190,6 +209,8 @@ public sealed class SettingsViewModel : ObservableObject
         SystemPrompt = s.SystemPrompt;
         Autostart = s.Autostart;
         ClaudePath = s.ClaudePath;
+        Theme = NormalizeChoice(s.Theme, ThemeChoices);
+        Language = NormalizeChoice(s.Language, LanguageChoices);
 
         Actions.Clear();
         foreach (var action in config.Actions)
@@ -212,7 +233,7 @@ public sealed class SettingsViewModel : ObservableObject
     private void AddNew()
     {
         var editor = CreateEditor(new ActionDefinition { Label = "", Prompt = "" }, isNew: true);
-        editor.Label = "Neue Aktion";
+        editor.Label = Lang.T("Neue Aktion", "New action");
         Actions.Add(editor);
         Selected = editor;
     }
@@ -224,7 +245,7 @@ public sealed class SettingsViewModel : ObservableObject
         var copy = Selected.ToDefinition();
         copy.Hotkey = null; // the same hotkey twice would not validate
         var editor = CreateEditor(copy, isNew: true);
-        editor.Label = $"{Selected.Label} (Kopie)";
+        editor.Label = Lang.T($"{Selected.Label} (Kopie)", $"{Selected.Label} (copy)");
         Actions.Insert(Actions.IndexOf(Selected) + 1, editor);
         Selected = editor;
     }
@@ -255,20 +276,23 @@ public sealed class SettingsViewModel : ObservableObject
         {
             if (int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
                 return value;
-            errors.Add(new ConfigError(null, field, "Bitte eine ganze Zahl eingeben.", $"{label}: keine ganze Zahl."));
+            errors.Add(new ConfigError(null, field, Lang.T("Bitte eine ganze Zahl eingeben.", "Please enter a whole number."),
+                Lang.T($"{label}: keine ganze Zahl.", $"{label}: not a whole number.")));
             return 0;
         }
 
         var settings = new AppSettings
         {
-            DoubleCopyMs = Number(DoubleCopyMs, "doubleCopyMs", "Zeitfenster"),
+            DoubleCopyMs = Number(DoubleCopyMs, "doubleCopyMs", Lang.T("Zeitfenster", "Time window")),
             MainHotkey = MainHotkey.Trim(),
             Model = Model.Trim(),
             TimeoutSeconds = Number(TimeoutSeconds, "timeoutSeconds", "Timeout"),
-            PasteDelayMs = Number(PasteDelayMs, "pasteDelayMs", "Wartezeit beim Einfügen"),
+            PasteDelayMs = Number(PasteDelayMs, "pasteDelayMs", Lang.T("Wartezeit beim Einfügen", "Paste delay")),
             SystemPrompt = SystemPrompt,
             Autostart = Autostart,
             ClaudePath = ClaudePath.Trim(),
+            Theme = Theme,
+            Language = Language,
         };
         var config = new ActionConfig { Settings = settings, Actions = Actions.Select(a => a.ToDefinition()).ToList() };
         return errors.Count > 0 ? (null, errors) : (config, []);
@@ -280,13 +304,15 @@ public sealed class SettingsViewModel : ObservableObject
         int Range(string text, string field, int min, int max, string label)
         {
             if (!int.TryParse(text.Trim().TrimEnd('%', ' '), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
-                errors.Add(new ConfigError(null, field, "Bitte eine ganze Zahl eingeben.", $"{label}: keine ganze Zahl."));
+                errors.Add(new ConfigError(null, field, Lang.T("Bitte eine ganze Zahl eingeben.", "Please enter a whole number."),
+                Lang.T($"{label}: keine ganze Zahl.", $"{label}: not a whole number.")));
             else if (value < min || value > max)
-                errors.Add(new ConfigError(null, field, $"Muss zwischen {min} und {max} liegen.", $"{label}: zwischen {min} und {max}."));
+                errors.Add(new ConfigError(null, field, Lang.T($"Muss zwischen {min} und {max} liegen.", $"Must be between {min} and {max}."),
+                    Lang.T($"{label}: zwischen {min} und {max}.", $"{label}: between {min} and {max}.")));
             return value;
         }
-        scale = Range(Scale, "scale", UiState.MinScale, UiState.MaxScale, "Skalierung");
-        popupWidth = Range(PopupWidth, "popupWidth", UiState.MinPopupWidth, UiState.MaxPopupWidth, "Popup-Breite");
+        scale = Range(Scale, "scale", UiState.MinScale, UiState.MaxScale, Lang.T("Skalierung", "Scale"));
+        popupWidth = Range(PopupWidth, "popupWidth", UiState.MinPopupWidth, UiState.MaxPopupWidth, Lang.T("Popup-Breite", "Popup width"));
         return errors;
     }
 
@@ -306,8 +332,14 @@ public sealed class SettingsViewModel : ObservableObject
         var firstBroken = errors.FirstOrDefault(e => e.ActionIndex is not null)?.ActionIndex;
         if (firstBroken is { } brokenIndex && Selected?.Errors.Any != true)
             Selected = Actions[brokenIndex];
-        SetStatus(errors.Count == 1 ? $"Nicht gespeichert: {errors[0].Message}" : $"Nicht gespeichert: {errors.Count} Fehler, siehe markierte Felder.", isError: true);
+        SetStatus(errors.Count == 1
+            ? Lang.T($"Nicht gespeichert: {errors[0].Message}", $"Not saved: {errors[0].Message}")
+            : Lang.T($"Nicht gespeichert: {errors.Count} Fehler, siehe markierte Felder.", $"Not saved: {errors.Count} errors, see the marked fields."), isError: true);
     }
+
+    /// <summary>The setting in lower case if it is one of the choices, otherwise "system" (also for empty).</summary>
+    private static string NormalizeChoice(string? value, IReadOnlyList<Choice> choices) =>
+        choices.FirstOrDefault(c => c.Value == value?.Trim().ToLowerInvariant())?.Value ?? choices[0].Value;
 
     private static string Capitalize(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
@@ -316,4 +348,11 @@ public sealed class SettingsViewModel : ObservableObject
         StatusIsError = isError;
         Status = text;
     }
+}
+
+/// <summary>One entry of a settings ComboBox: the value stored in actions.json and its label.</summary>
+public sealed record Choice(string Value, string Label)
+{
+    // The themed ComboBox shows the selected item as text, without DisplayMemberPath.
+    public override string ToString() => Label;
 }

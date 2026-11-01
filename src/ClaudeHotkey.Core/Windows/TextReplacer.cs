@@ -1,5 +1,6 @@
 using ClaudeHotkey.Core.Clipboard;
 using ClaudeHotkey.Core.Input;
+using ClaudeHotkey.Core.Localization;
 
 namespace ClaudeHotkey.Core.Windows;
 
@@ -18,7 +19,7 @@ public sealed class SystemWindowActivator : IWindowActivator
     public Task<bool> WaitUntilForegroundAsync(IntPtr hwnd, TimeSpan timeout) => ForegroundWindow.WaitUntilForegroundAsync(hwnd, timeout);
 }
 
-/// <param name="Message">German message when the text could not be pasted; null on success.</param>
+/// <param name="Message">Message (UI language) when the text could not be pasted; null on success.</param>
 public sealed record ReplaceResult(bool Success, string? Message);
 
 /// <summary>
@@ -31,9 +32,15 @@ public sealed class TextReplacer(IClipboard clipboard, IKeyboardInput keyboard, 
     private static readonly TimeSpan ModifierTimeout = TimeSpan.FromSeconds(2);
     private const int VirtualKeyV = 0x56;
 
-    public const string WindowGoneMessage = "Das Zielfenster ist nicht mehr geöffnet. Das Ergebnis lässt sich nur kopieren.";
-    public const string ActivateFailedMessage = "Das Zielfenster ließ sich nicht aktivieren. Das Ergebnis liegt in der Zwischenablage.";
-    public const string KeysHeldMessage = "Tasten wurden nicht losgelassen. Das Ergebnis liegt in der Zwischenablage.";
+    public static string WindowGoneMessage => Lang.T(
+        "Das Zielfenster ist nicht mehr geöffnet. Das Ergebnis lässt sich nur kopieren.",
+        "The target window is no longer open. The result can only be copied.");
+    public static string ActivateFailedMessage => Lang.T(
+        "Das Zielfenster ließ sich nicht aktivieren. Das Ergebnis liegt in der Zwischenablage.",
+        "The target window could not be activated. The result is in the clipboard.");
+    public static string KeysHeldMessage => Lang.T(
+        "Tasten wurden nicht losgelassen. Das Ergebnis liegt in der Zwischenablage.",
+        "Keys were not released. The result is in the clipboard.");
 
     /// <param name="pasteDelay">
     /// How long the target app gets to read the clipboard after Ctrl+V before the old content is

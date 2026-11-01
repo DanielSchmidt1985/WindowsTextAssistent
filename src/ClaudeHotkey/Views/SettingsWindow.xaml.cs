@@ -21,7 +21,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = viewModel;
-        SourceInitialized += (_, _) => DarkTitleBar.Apply(this);
+        SourceInitialized += (_, _) => ThemedTitleBar.Apply(this);
         InputBindings.Add(new KeyBinding(viewModel.SaveCommand, Key.S, ModifierKeys.Control));
         UiScale.UpdateTextMode(this, scalePercent);
         if (stepScale is not null)
@@ -53,7 +53,8 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        var answer = MessageBox.Show(this, "Die Änderungen sind noch nicht gespeichert. Jetzt speichern?",
+        var answer = MessageBox.Show(this, Core.Localization.Lang.T("Die Änderungen sind noch nicht gespeichert. Jetzt speichern?",
+                "The changes are not saved yet. Save now?"),
             "ClaudeHotkey", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         if (answer == MessageBoxResult.Cancel || (answer == MessageBoxResult.Yes && !_viewModel.Save()))
         {

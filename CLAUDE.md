@@ -21,8 +21,10 @@ dotnet publish src/ClaudeHotkey -c Release -r win-x64 --self-contained -p:Publis
 ```
 
 Demo states (see `App.ShowDemo`): `choose input running result error nocapture replacefail feedback settings
-settings-general settings-errors settings-test`. Demos use copies in `%TEMP%`, never the real config. They are the
-way to check UI changes visually: start, screenshot, kill.
+settings-general settings-errors settings-test`, plus optional `[scale] [dark|light] [de|en]` in any order. Demos
+use copies in `%TEMP%`, never the real config. They are the way to check UI changes visually: start, screenshot,
+kill. Check both themes and both languages. The settings window is not topmost and may open on another monitor:
+find it via `EnumWindows` by PID and capture its rect.
 
 - **The running app locks `bin\Debug`.** Before building for a hand-over: `ClaudeHotkey.exe --exit`, build, then
   start the new build yourself (the user wants this done for them). For builds/tests while it runs, use a separate
@@ -61,11 +63,20 @@ Flow of one use:
 
 Configuration and state, all in `%APPDATA%\ClaudeHotkey`:
 - `actions.json` (`Config/ActionConfig`, `ActionConfigStore`): settings + actions. Created from the embedded
-  `Config/actions.default.json`. Reloaded on every trigger by mtime; a broken file keeps the last valid config.
+  `Config/actions.default.json` (German) or `actions.default-en.json` (keep both in sync; a test compares their
+  ids/hotkeys/models). Reloaded on every trigger by mtime; a broken file keeps the last valid config.
   `ValidateDetailed` returns errors per action/field for the settings dialog. Atomic writes (tmp + move).
+  `settings.language` (system/de/en) and `settings.theme` (system/dark/light).
 - `ui.json` (`Config/UiState`): scale, popup width, settings window bounds — separate so popup dragging never
   races with the dialog saving `actions.json`.
-- `theme.json` (optional): overrides `*Brush` tokens of `Themes/Theme.Neptun.xaml` at runtime.
+- `theme.json` (optional): overrides `*Brush` tokens of the active palette at runtime.
+
+Language: `Core/Localization/Lang` — every user-visible text is `Lang.T("deutsch", "english")` at the call site;
+window texts live in `src/ClaudeHotkey/Localization/Ui.cs` and XAML uses `{x:Static l:Ui.Name}`. "system" = German
+for a German display language, English otherwise. Tests run in German (`TestSetup` module initializer); never
+switch `Lang.Current` inside a test (classes run in parallel). Theme: styles in `Themes/Theme.Neptun.xaml` use only
+`DynamicResource` tokens from `Colors.Dark.xaml`/`Colors.Light.xaml` (same keys, tested); `ThemeManager` copies a
+palette into the app resources and follows the Windows app mode via `SystemEvents.UserPreferenceChanged`.
 - `log.txt` (`Logging/AppLog`): only event/action id/duration/code; the API has no free-text parameter on purpose.
 
 Other pieces: tray (`Views/TrayIcon`, H.NotifyIcon.Wpf **2.3.2** — 2.4.x has no net8 build; `ForceCreate(false)`
@@ -88,11 +99,17 @@ not on every start so a debug build never redirects the installed entry).
   overrides button text colours); windows set `Foreground` instead. XML comments in `.csproj` must not contain `--`.
 - **Hotkeys:** a single Ctrl+C/X/V via `RegisterHotKey` would steal the key from all apps — validation rejects it
   (`BlocksClipboardKeys`). For double presses the first press reaches the app.
+- **ComboBox with records:** the themed ComboBox shows the selected item via `ToString()` even with
+  `DisplayMemberPath`; `Choice` overrides `ToString()` for that.
+- **Embedded resources named `*.en.json`** become satellite assemblies (culture "en"); hence `actions.default-en.json`.
+- **Files with a BOM** (`App.xaml.cs`): a sed rule anchored on the first line (`^using …`) does not match.
 - **Process.MainWindowHandle** is 0 for the popup (no taskbar entry); find windows via `EnumWindows` by PID.
 
 ## Conventions
 
-- UI texts, README, commit messages: German. Code, identifiers and code comments: English.
+- UI texts: German and English (both, via `Lang.T`). README, commit messages: German. Code, identifiers and code
+  comments: English.
+- Never `sed -i` over a `grep -rl` result without excluding `bin`/`obj`: it rewrites dll/pdb files too.
 - Commit after each finished step; commit messages end with the `Co-Authored-By` line given by the session.
 - Remote: `origin` = https://github.com/DanielSchmidt1985/WindowsTextAssistent (`main`). Push when asked.
 - Releases: bump `<Version>` in `src/ClaudeHotkey/ClaudeHotkey.csproj`, publish from a clean, pushed commit, tag

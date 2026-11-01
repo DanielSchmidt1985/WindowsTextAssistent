@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:ClaudeHotkey.Views"
         xmlns:vm="clr-namespace:ClaudeHotkey.ViewModels"
-        Title="ClaudeHotkey – Einstellungen"
+        xmlns:l="clr-namespace:ClaudeHotkey.Localization"
+        Title="{x:Static l:Ui.SettingsTitle}"
         Width="880" Height="680" MinWidth="720" MinHeight="520" WindowStartupLocation="CenterScreen"
         Background="{DynamicResource BgBrush}" Foreground="{DynamicResource TextBrush}"
         FontFamily="{StaticResource UiFont}" FontSize="{StaticResource FontSize}"
@@ -21,9 +22,9 @@
         <!-- Bottom bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button Content="Schließen" Margin="0,0,8,0" Click="Close_Click" />
-                <Button Style="{StaticResource PrimaryButton}" Content="Speichern" Command="{Binding SaveCommand}"
-                        ToolTip="Speichern (Strg+S)" />
+                <Button Content="{x:Static l:Ui.Close}" Margin="0,0,8,0" Click="Close_Click" />
+                <Button Style="{StaticResource PrimaryButton}" Content="{x:Static l:Ui.Save}" Command="{Binding SaveCommand}"
+                        ToolTip="{x:Static l:Ui.SaveTip}" />
             </StackPanel>
             <TextBlock x:Name="StatusText" Text="{Binding Status}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0">
                 <TextBlock.Style>
@@ -40,7 +41,7 @@
 
         <TabControl x:Name="Tabs">
             <!-- Actions -->
-            <TabItem Header="Aktionen">
+            <TabItem Header="{x:Static l:Ui.TabActions}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="240" />
@@ -51,14 +52,14 @@
                     <DockPanel Grid.Column="0">
                         <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="Neu" Margin="0,0,4,0" Command="{Binding NewCommand}" />
-                                <Button Content="Duplizieren" Margin="0,0,4,0" Command="{Binding DuplicateCommand}" />
-                                <Button Content="Löschen" Command="{Binding DeleteCommand}" />
+                                <Button Content="{x:Static l:Ui.New}" Margin="0,0,4,0" Command="{Binding NewCommand}" />
+                                <Button Content="{x:Static l:Ui.Duplicate}" Margin="0,0,4,0" Command="{Binding DuplicateCommand}" />
+                                <Button Content="{x:Static l:Ui.Delete}" Command="{Binding DeleteCommand}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <Button Content="↑" Width="36" Padding="0" Margin="0,0,4,0" ToolTip="Nach oben" Command="{Binding MoveUpCommand}" />
-                                <Button Content="↓" Width="36" Padding="0" ToolTip="Nach unten" Command="{Binding MoveDownCommand}" />
-                                <TextBlock Style="{StaticResource Muted}" Text="oder ziehen" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                <Button Content="↑" Width="36" Padding="0" Margin="0,0,4,0" ToolTip="{x:Static l:Ui.MoveUp}" Command="{Binding MoveUpCommand}" />
+                                <Button Content="↓" Width="36" Padding="0" ToolTip="{x:Static l:Ui.MoveDown}" Command="{Binding MoveDownCommand}" />
+                                <TextBlock Style="{StaticResource Muted}" Text="{x:Static l:Ui.OrDrag}" VerticalAlignment="Center" Margin="8,0,0,0" />
                             </StackPanel>
                         </StackPanel>
                         <ListBox x:Name="ActionList" ItemsSource="{Binding Actions}" SelectedItem="{Binding Selected}" AllowDrop="True"
@@ -68,7 +69,7 @@
                                 <DataTemplate DataType="{x:Type vm:ActionEditorViewModel}">
                                     <DockPanel>
                                         <TextBlock DockPanel.Dock="Right" Text="●" Foreground="{DynamicResource DangerBrush}" Margin="6,0,0,0"
-                                                   ToolTip="Hat Fehler"
+                                                   ToolTip="{x:Static l:Ui.HasErrors}"
                                                    Visibility="{Binding Errors.Any, Converter={StaticResource BoolToVisibility}}" />
                                         <TextBlock Text="{Binding DisplayLabel}" TextTrimming="CharacterEllipsis">
                                             <TextBlock.Style>
@@ -87,30 +88,30 @@
                         </ListBox>
                     </DockPanel>
 
-                    <TextBlock Grid.Column="2" Style="{StaticResource Muted}" Text="Keine Aktion ausgewählt. Mit „Neu“ eine anlegen."
+                    <TextBlock Grid.Column="2" Style="{StaticResource Muted}" Text="{x:Static l:Ui.NoActionSelected}"
                                Visibility="{Binding Selected, Converter={StaticResource NullToVisible}}" />
 
                     <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" DataContext="{Binding Selected}"
                                   Visibility="{Binding Converter={StaticResource NotNullToVisible}}">
                         <StackPanel Margin="0,0,8,0">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Name (Button im Popup)" Margin="0,0,0,4" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.LabelField}" Margin="0,0,0,4" />
                             <TextBox Text="{Binding Label, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding Errors[label]}" />
                             <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0" FontSize="12">
-                                <Run Text="Kennung:" /> <Run Text="{Binding Id, Mode=OneWay}" />
+                                <Run Text="{x:Static l:Ui.IdLabel}" /> <Run Text="{Binding Id, Mode=OneWay}" />
                             </TextBlock>
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding Errors[id]}" />
 
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Prompt (Anweisung an Claude)" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.PromptField}" />
                             <TextBox Style="{StaticResource Multiline}" Height="110" Text="{Binding Prompt, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Der markierte Text wird getrennt übergeben. {input} wird durch die Eingabe im Popup ersetzt (mit „Eingabefeld im Popup“)." />
+                                       Text="{x:Static l:Ui.PromptHint}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding Errors[prompt]}" />
 
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zusätzliches Feedback (optional)" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.FeedbackField}" />
                             <TextBox Style="{StaticResource Multiline}" Height="60" Text="{Binding Feedback, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Was Claude außer dem Ergebnis sagen soll, z. B. ein Coaching zu den Fehlern. Steht im Popup unter dem Ergebnis und wird nie eingefügt. Kostet einige Sekunden mehr." />
+                                       Text="{x:Static l:Ui.FeedbackHint}" />
 
                             <Grid Margin="0,0,0,0">
                                 <Grid.ColumnDefinitions>
@@ -119,40 +120,40 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Modell" />
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.ModelField}" />
                                     <ComboBox IsEditable="True" Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"
                                               ItemsSource="{Binding DataContext.Models, RelativeSource={RelativeSource AncestorType=Window}}" />
-                                    <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" Text="Leer = Standardmodell aus „Allgemein“" />
+                                    <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" Text="{x:Static l:Ui.ModelHint}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Eigener Hotkey (optional)" />
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.ActionHotkeyField}" />
                                     <local:HotkeyTextBox Style="{StaticResource {x:Type TextBox}}" Text="{Binding Hotkey}" />
                                     <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                               Text="Anklicken und Kombination drücken, für Doppeldruck die Taste zweimal (z. B. Strg+X+X). Entf löscht. Führt die Aktion direkt aus." />
+                                               Text="{x:Static l:Ui.ActionHotkeyHint}" />
                                     <TextBlock Style="{StaticResource FieldError}" Text="{Binding Errors[hotkey]}" />
                                 </StackPanel>
                             </Grid>
 
                             <StackPanel Margin="0,14,0,0">
-                                <CheckBox Content="Ersetzen-Button anzeigen" IsChecked="{Binding Replace}" />
-                                <CheckBox Content="Eingabefeld im Popup" IsChecked="{Binding AskInput}" Margin="0,10,0,0" />
+                                <CheckBox Content="{x:Static l:Ui.ShowReplace}" IsChecked="{Binding Replace}" />
+                                <CheckBox Content="{x:Static l:Ui.AskInputCheck}" IsChecked="{Binding AskInput}" Margin="0,10,0,0" />
                                 <TextBlock Style="{StaticResource FieldError}" Text="{Binding Errors[askInput]}" />
-                                <CheckBox Content="Aktiv (im Popup anzeigen)" IsChecked="{Binding Enabled}" Margin="0,10,0,0" />
+                                <CheckBox Content="{x:Static l:Ui.EnabledCheck}" IsChecked="{Binding Enabled}" Margin="0,10,0,0" />
                             </StackPanel>
 
                             <!-- Try the action without leaving the dialog -->
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Margin="0,16,0,0" Padding="0,10,0,0">
                                 <StackPanel>
-                                    <TextBlock Style="{StaticResource Heading}" Text="Testen" />
-                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Beispieltext" />
+                                    <TextBlock Style="{StaticResource Heading}" Text="{x:Static l:Ui.Test}" />
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.SampleText}" />
                                     <TextBox Style="{StaticResource Multiline}" Height="60" Text="{Binding TestText, UpdateSourceTrigger=PropertyChanged}" />
                                     <StackPanel Visibility="{Binding AskInput, Converter={StaticResource BoolToVisibility}}">
-                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Eingabe im Popup ({input})" />
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.TestInputField}" />
                                         <TextBox Text="{Binding TestInput, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <Button Content="Testen" Command="{Binding TestCommand}" Margin="0,0,8,0" />
-                                        <Button Content="Abbrechen" Command="{Binding CancelTestCommand}"
+                                        <Button Content="{x:Static l:Ui.Test}" Command="{Binding TestCommand}" Margin="0,0,8,0" />
+                                        <Button Content="{x:Static l:Ui.Cancel}" Command="{Binding CancelTestCommand}"
                                                 Visibility="{Binding IsTesting, Converter={StaticResource BoolToVisibility}}" />
                                     </StackPanel>
                                     <ProgressBar Style="{StaticResource BusyBar}" Margin="0,8,0,0"
@@ -176,7 +177,7 @@
             </TabItem>
 
             <!-- General -->
-            <TabItem Header="Allgemein">
+            <TabItem Header="{x:Static l:Ui.TabGeneral}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                   <StackPanel MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,8,0">
                     <Grid>
@@ -186,42 +187,42 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Zeitfenster für Doppeldruck (ms)" Margin="0,0,0,4" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.DoubleCopyField}" Margin="0,0,0,4" />
                             <TextBox Text="{Binding DoubleCopyMs, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[doubleCopyMs]}" />
 
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Standardmodell" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.DefaultModelField}" />
                             <ComboBox IsEditable="True" Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding Models}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[model]}" />
 
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Wartezeit beim Einfügen (ms)" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.PasteDelayField}" />
                             <TextBox Text="{Binding PasteDelayMs, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Erhöhen, wenn ein Programm beim Ersetzen noch den alten Text einfügt." />
+                                       Text="{x:Static l:Ui.PasteDelayHint}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[pasteDelayMs]}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Haupt-Hotkey (öffnet das Popup)" Margin="0,0,0,4" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.MainHotkeyField}" Margin="0,0,0,4" />
                             <local:HotkeyTextBox Style="{StaticResource {x:Type TextBox}}" Text="{Binding MainHotkey}" />
                             <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Standard Strg+C+C. Für Doppeldruck die Taste zweimal drücken. Bei Strg+C+C und Strg+X+X kopiert das Programm selbst, sonst kopiert das Tool und stellt die Zwischenablage wieder her." />
+                                       Text="{x:Static l:Ui.MainHotkeyHint}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[mainHotkey]}" />
 
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Timeout (Sekunden)" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.TimeoutField}" />
                             <TextBox Text="{Binding TimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[timeoutSeconds]}" />
 
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Pfad zur Claude-CLI (optional)" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.ClaudePathField}" />
                             <TextBox Text="{Binding ClaudePath, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" Text="Leer = claude.exe im PATH suchen" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" Text="{x:Static l:Ui.ClaudePathHint}" />
                         </StackPanel>
 
                     </Grid>
 
-                    <TextBlock Style="{StaticResource FieldLabel}" Text="System-Prompt (gilt für alle Aktionen)" Margin="0,14,0,4" />
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.SystemPromptField}" Margin="0,14,0,4" />
                     <TextBox Style="{StaticResource Multiline}" Height="90" Text="{Binding SystemPrompt, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Style="{StaticResource Heading}" Text="Darstellung" Margin="0,18,0,0" />
+                    <TextBlock Style="{StaticResource Heading}" Text="{x:Static l:Ui.Appearance}" Margin="0,18,0,0" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -229,24 +230,47 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Skalierung von Schrift und Bedienelementen (%)" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.ThemeField}" />
+                            <ComboBox ItemsSource="{Binding ThemeChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                                      SelectedValue="{Binding Theme}" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="{x:Static l:Ui.ThemeHint}" />
+                            <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[theme]}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.LanguageField}" />
+                            <ComboBox ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                                      SelectedValue="{Binding Language}" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="{x:Static l:Ui.LanguageHint}" />
+                            <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[language]}" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.ScaleField}" />
                             <TextBox Text="{Binding Scale, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="75–200. Schneller: Strg+Mausrad oder Strg+Plus/Minus in Popup und Einstellungen, Strg+0 = 100 %." />
+                                       Text="{x:Static l:Ui.ScaleHint}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[scale]}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Breite des Popups (px)" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="{x:Static l:Ui.PopupWidthField}" />
                             <TextBox Text="{Binding PopupWidth, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="320–1600. Oder im Popup am rechten Rand ziehen. Die Höhe wächst mit dem Inhalt." />
+                                       Text="{x:Static l:Ui.PopupWidthHint}" />
                             <TextBlock Style="{StaticResource FieldError}" Text="{Binding GeneralErrors[popupWidth]}" />
                         </StackPanel>
                     </Grid>
 
-                    <CheckBox Content="Mit Windows starten" IsChecked="{Binding Autostart}" Margin="0,18,0,0" />
+                    <CheckBox Content="{x:Static l:Ui.Autostart}" IsChecked="{Binding Autostart}" Margin="0,18,0,0" />
                     <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="40,4,0,0" TextWrapping="Wrap"
-                               Text="Beim Speichern wird dieses Programm unter HKCU\…\Run eingetragen bzw. wieder entfernt. Am besten aus der veröffentlichten .exe einschalten, nicht aus einem Test-Build." />
+                               Text="{x:Static l:Ui.AutostartHint}" />
                   </StackPanel>
                 </ScrollViewer>
             </TabItem>

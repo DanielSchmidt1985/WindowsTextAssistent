@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using ClaudeHotkey.Core.Localization;
 
 namespace ClaudeHotkey.Core.Claude;
 
@@ -128,16 +129,24 @@ public sealed class ClaudeCli
         var builder = new StringBuilder();
         if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
             builder.Append(request.SystemPrompt.Trim()).Append("\n\n");
-        builder.Append("Aufgabe:\n").Append(request.ActionPrompt.Trim());
+        // In the UI language, like the default actions it frames.
+        builder.Append(Lang.T("Aufgabe:\n", "Task:\n")).Append(request.ActionPrompt.Trim());
         if (WantsFeedback(request))
         {
             // Spelled out because the general system prompt forbids explanations: without this
             // the model either drops the feedback or mixes it into the result.
-            builder.Append("\n\nAntwortformat: ein Objekt mit zwei Feldern.\n")
-                .Append("„text“: nur das Ergebnis der Aufgabe, genau so, wie es den markierten Text ersetzen soll, ohne Erklärung.\n")
-                .Append("„feedback“: ").Append(request.FeedbackInstruction!.Trim()).Append('\n')
-                .Append("Erklärungen und Hinweise gehören ausschließlich in „feedback“. ")
-                .Append("Nur wenn es nach dieser Anweisung wirklich nichts zu sagen gibt, ist „feedback“ ein leerer String.");
+            if (Lang.IsGerman)
+                builder.Append("\n\nAntwortformat: ein Objekt mit zwei Feldern.\n")
+                    .Append("„text“: nur das Ergebnis der Aufgabe, genau so, wie es den markierten Text ersetzen soll, ohne Erklärung.\n")
+                    .Append("„feedback“: ").Append(request.FeedbackInstruction!.Trim()).Append('\n')
+                    .Append("Erklärungen und Hinweise gehören ausschließlich in „feedback“. ")
+                    .Append("Nur wenn es nach dieser Anweisung wirklich nichts zu sagen gibt, ist „feedback“ ein leerer String.");
+            else
+                builder.Append("\n\nAnswer format: an object with two fields.\n")
+                    .Append("\"text\": only the result of the task, exactly as it should replace the selected text, without explanation.\n")
+                    .Append("\"feedback\": ").Append(request.FeedbackInstruction!.Trim()).Append('\n')
+                    .Append("Explanations and hints belong in \"feedback\" only. ")
+                    .Append("Only if there is really nothing to say according to this instruction, \"feedback\" is an empty string.");
         }
         return builder.ToString();
     }
@@ -256,22 +265,26 @@ public sealed class ClaudeCli
 
         var usesSubscription = apiKeySource is null or "none";
         var message = usesSubscription
-            ? "Abo aktiv"
-            : $"Warnung: Claude nutzt einen API-Key ({apiKeySource}), nicht das Abo.";
+            ? Lang.T("Abo aktiv", "Subscription active")
+            : Lang.T($"Warnung: Claude nutzt einen API-Key ({apiKeySource}), nicht das Abo.",
+                $"Warning: Claude uses an API key ({apiKeySource}), not the subscription.");
         return new PreflightResult(ClaudeErrorKind.None, usesSubscription, authMethod, apiKeySource, message, null);
     }
 
     public static string MessageFor(ClaudeErrorKind kind, TimeSpan? timeout = null) => kind switch
     {
-        ClaudeErrorKind.CliNotFound => "Claude-CLI nicht gefunden. Pfad in den Einstellungen prüfen oder Claude Code installieren.",
-        ClaudeErrorKind.NotLoggedIn => "Claude-CLI ist nicht angemeldet. Im Terminal „claude auth login“ ausführen.",
-        ClaudeErrorKind.LimitReached => "Nutzungslimit des Abos erreicht. Später erneut versuchen.",
-        ClaudeErrorKind.EmptyResponse => "Claude hat keine Antwort geliefert.",
+        ClaudeErrorKind.CliNotFound => Lang.T("Claude-CLI nicht gefunden. Pfad in den Einstellungen prüfen oder Claude Code installieren.",
+            "Claude CLI not found. Check the path in the settings or install Claude Code."),
+        ClaudeErrorKind.NotLoggedIn => Lang.T("Claude-CLI ist nicht angemeldet. Im Terminal „claude auth login“ ausführen.",
+            "Claude CLI is not logged in. Run \"claude auth login\" in a terminal."),
+        ClaudeErrorKind.LimitReached => Lang.T("Nutzungslimit des Abos erreicht. Später erneut versuchen.",
+            "Usage limit of the subscription reached. Try again later."),
+        ClaudeErrorKind.EmptyResponse => Lang.T("Claude hat keine Antwort geliefert.", "Claude returned no answer."),
         ClaudeErrorKind.Timeout => timeout is { } t
-            ? $"Keine Antwort nach {t.TotalSeconds:0} Sekunden, Aufruf abgebrochen."
-            : "Zeitüberschreitung, Aufruf abgebrochen.",
-        ClaudeErrorKind.Cancelled => "Abgebrochen.",
-        ClaudeErrorKind.Failed => "Claude-Aufruf fehlgeschlagen.",
+            ? Lang.T($"Keine Antwort nach {t.TotalSeconds:0} Sekunden, Aufruf abgebrochen.", $"No answer after {t.TotalSeconds:0} seconds, call cancelled.")
+            : Lang.T("Zeitüberschreitung, Aufruf abgebrochen.", "Timeout, call cancelled."),
+        ClaudeErrorKind.Cancelled => Lang.T("Abgebrochen.", "Cancelled."),
+        ClaudeErrorKind.Failed => Lang.T("Claude-Aufruf fehlgeschlagen.", "Claude call failed."),
         _ => "",
     };
 
