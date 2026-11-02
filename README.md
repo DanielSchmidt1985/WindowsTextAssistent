@@ -4,7 +4,7 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Version 1.1.0, alle sieben Phasen des Plans umgesetzt**, dazu Streaming, Deutsch/Englisch und helles Farbschema.
+Stand: **Version 1.1.1, alle sieben Phasen des Plans umgesetzt**, dazu Streaming, Deutsch/Englisch und helles Farbschema.
 
 ## Installation
 

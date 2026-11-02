@@ -16,7 +16,7 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Product>ClaudeHotkey</Product>
     <Description>Hotkey-Textassistent mit Claude</Description>
   </PropertyGroup>
