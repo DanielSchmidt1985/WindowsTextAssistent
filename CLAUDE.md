@@ -83,7 +83,9 @@ palette into the app resources and follows the Windows app mode via `SystemEvent
 Other pieces: tray (`Views/TrayIcon`, H.NotifyIcon.Wpf **2.3.2** — 2.4.x has no net8 build; `ForceCreate(false)`
 because efficiency mode throttles the process and Windows then drops the keyboard hook), single instance with
 activate/exit signals (`Startup/SingleInstance`), autostart via HKCU Run only on "Speichern" (`Startup/Autostart`,
-not on every start so a debug build never redirects the installed entry).
+not on every start so a debug build never redirects the installed entry), self-update (`Update/Updater` + `App.Update.cs`:
+GitHub releases/latest, asset `ClaudeHotkey.exe` verified by size + `digest`, swap by renaming the running exe to
+`.old`, restart with `--updated <pid>`; only the installed copy, only when no popup/capture/settings window is open).
 
 ## Pitfalls found the hard way
 
@@ -116,6 +118,7 @@ not on every start so a debug build never redirects the installed entry).
 - Releases: bump `<Version>` in `src/ClaudeHotkey/ClaudeHotkey.csproj`, publish from a clean, pushed commit, tag
   `vX.Y.Z`, then `"C:\Program Files\GitHub CLI\gh.exe" release create vX.Y.Z publish\ClaudeHotkey.exe --notes-file …`
   (gh is logged in as DanielSchmidt1985). Single file is uncompressed on purpose (114 vs 222 MB working set).
+  The asset must be named `ClaudeHotkey.exe`: installed copies from 1.2.0 on update themselves from the latest release.
 - Installed copy: `%LOCALAPPDATA%\Programs\ClaudeHotkey\ClaudeHotkey.exe` (autostart points there). Update it with
   `--exit`, copy, start.
 - Don't change the user's registry, `actions.json` or other personal config without saying so; back up before

@@ -73,6 +73,8 @@ public partial class App : Application
             return;
         }
 
+        WaitForPreviousInstance(e.Args);
+
         // A second start opens the settings of the running instance instead; "--exit" quits it.
         var exitRequested = e.Args.Contains("--exit");
         _instance = SingleInstance.Acquire(
@@ -96,6 +98,7 @@ public partial class App : Application
         _tray = new TrayIcon();
         _tray.SettingsRequested += (_, _) => OpenSettings();
         _tray.OpenLogRequested += (_, _) => OpenLogFile();
+        _tray.UpdateCheckRequested += async (_, _) => await CheckForUpdateAsync(manual: true);
         _tray.ExitRequested += (_, _) => Shutdown();
 
         var themeProblems = ThemeManager.Apply(Resources, _config.Current.Settings.Theme, _config.Directory);
@@ -120,6 +123,7 @@ public partial class App : Application
 
         UpdateTrayStatus();
         _ = RunPreflightAsync(settings);
+        StartUpdates(e.Args);
     }
 
     private async Task RunPreflightAsync(AppSettings settings)
@@ -532,6 +536,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        StopUpdates();
         _popup?.Close();
         _settings?.Close();
         _hook?.Dispose();

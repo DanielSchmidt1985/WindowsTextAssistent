@@ -20,6 +20,7 @@ public sealed class TrayIcon : IDisposable
     private readonly MenuItem _statusItem;
     private readonly MenuItem _settingsItem;
     private readonly MenuItem _logItem;
+    private readonly MenuItem _updateItem;
     private readonly MenuItem _exitItem;
 
     public TrayIcon()
@@ -29,6 +30,8 @@ public sealed class TrayIcon : IDisposable
         settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         var log = _logItem = new MenuItem();
         log.Click += (_, _) => OpenLogRequested?.Invoke(this, EventArgs.Empty);
+        var update = _updateItem = new MenuItem();
+        update.Click += (_, _) => UpdateCheckRequested?.Invoke(this, EventArgs.Empty);
         var exit = _exitItem = new MenuItem();
         UpdateTexts();
         exit.Click += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
@@ -37,7 +40,7 @@ public sealed class TrayIcon : IDisposable
         {
             IconSource = NormalIcon,
             ToolTipText = "ClaudeHotkey",
-            ContextMenu = new ContextMenu { Items = { _statusItem, new Separator(), settings, log, new Separator(), exit } },
+            ContextMenu = new ContextMenu { Items = { _statusItem, new Separator(), settings, log, update, new Separator(), exit } },
             DoubleClickCommand = new ViewModels.RelayCommand(() => SettingsRequested?.Invoke(this, EventArgs.Empty)),
         };
         // false: no Windows efficiency mode. It throttles the process, and a throttled low-level
@@ -50,11 +53,13 @@ public sealed class TrayIcon : IDisposable
     {
         _settingsItem.Header = Lang.T("Einstellungen …", "Settings …");
         _logItem.Header = Lang.T("Logdatei öffnen", "Open log file");
+        _updateItem.Header = Lang.T("Nach Updates suchen", "Check for updates");
         _exitItem.Header = Lang.T("Beenden", "Exit");
     }
 
     public event EventHandler? SettingsRequested;
     public event EventHandler? OpenLogRequested;
+    public event EventHandler? UpdateCheckRequested;
     public event EventHandler? ExitRequested;
 
     /// <param name="summary">One line, shown in the tooltip and at the top of the menu.</param>

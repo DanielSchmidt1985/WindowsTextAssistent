@@ -28,6 +28,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string _pasteDelayMs = "";
     private string _systemPrompt = "";
     private bool _autostart;
+    private bool _autoUpdate = true;
     private string _claudePath = "";
     private string _theme = ThemeSetting.System;
     private string _language = Lang.System;
@@ -88,6 +89,7 @@ public sealed class SettingsViewModel : ObservableObject
     public string PasteDelayMs { get => _pasteDelayMs; set => Set(ref _pasteDelayMs, value); }
     public string SystemPrompt { get => _systemPrompt; set => Set(ref _systemPrompt, value); }
     public bool Autostart { get => _autostart; set => Set(ref _autostart, value); }
+    public bool AutoUpdate { get => _autoUpdate; set => Set(ref _autoUpdate, value); }
     public string ClaudePath { get => _claudePath; set => Set(ref _claudePath, value); }
 
     /// <summary>settings.theme: "system", "dark" or "light".</summary>
@@ -208,6 +210,7 @@ public sealed class SettingsViewModel : ObservableObject
         PasteDelayMs = s.PasteDelayMs.ToString(CultureInfo.InvariantCulture);
         SystemPrompt = s.SystemPrompt;
         Autostart = s.Autostart;
+        AutoUpdate = s.AutoUpdate;
         ClaudePath = s.ClaudePath;
         Theme = NormalizeChoice(s.Theme, ThemeChoices);
         Language = NormalizeChoice(s.Language, LanguageChoices);
@@ -290,6 +293,7 @@ public sealed class SettingsViewModel : ObservableObject
             PasteDelayMs = Number(PasteDelayMs, "pasteDelayMs", Lang.T("Wartezeit beim Einfügen", "Paste delay")),
             SystemPrompt = SystemPrompt,
             Autostart = Autostart,
+            AutoUpdate = AutoUpdate,
             ClaudePath = ClaudePath.Trim(),
             Theme = Theme,
             Language = Language,

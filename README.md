@@ -4,7 +4,8 @@ Persönliches Windows-Tool: Strg+C+C übernimmt den markierten Text, ein Popup b
 Übersetzen oder Verbessern an, die Aktion läuft über die lokale Claude-CLI (`claude -p`) mit dem
 vorhandenen Claude-Abo, und das Ergebnis lässt sich per Button ins Quellfenster einsetzen.
 
-Stand: **Version 1.1.1, alle sieben Phasen des Plans umgesetzt**, dazu Streaming, Deutsch/Englisch und helles Farbschema.
+Stand: **Version 1.2.0, alle sieben Phasen des Plans umgesetzt**, dazu Streaming, Deutsch/Englisch, helles Farbschema,
+Weiterbearbeiten im Popup und automatisches Update.
 
 ## Installation
 
@@ -23,7 +24,8 @@ normalen Terminal, prüfen mit `claude auth status`). Eine .NET-Laufzeit ist nic
 3. Für den Start mit Windows: Tray → Einstellungen → Allgemein → „Mit Windows starten“ → Speichern. Das aus der
    installierten `.exe` heraus tun, damit der Autostart-Eintrag auf diese Kopie zeigt.
 
-**Update:** `ClaudeHotkey.exe --exit` (oder Tray → Beenden), die neue `.exe` über die alte kopieren, starten.
+**Update:** Ab Version 1.2.0 aktualisiert sich die installierte Kopie selbst (siehe „Automatisches Update“). Von
+Hand: `ClaudeHotkey.exe --exit` (oder Tray → Beenden), die neue `.exe` über die alte kopieren, starten.
 Einstellungen, Aktionen und Log liegen in `%APPDATA%\ClaudeHotkey` und bleiben erhalten.
 
 **Deinstallation:** In den Einstellungen „Mit Windows starten“ ausschalten und speichern, Tray → Beenden, dann
@@ -50,8 +52,8 @@ Nach der Installation von Hand, aus dem Plan:
 - [ ] Nach einem Neustart von Windows läuft das Tool im Tray; „Beenden“ schließt es sauber.
 - [ ] Das Design stimmt mit dem Referenz-Screenshot überein (offen: `docs/neptun-reference.png` fehlt noch).
 
-Automatisch geprüft (`dotnet test`, 202 Tests) sind Konfiguration, CLI-Aufruf, Zwischenablage, Hotkey-Erkennung,
-Ersetzen-Ablauf, Einstellungsdialog, Log, Autostart und Einzelinstanz.
+Automatisch geprüft (`dotnet test`, 269 Tests) sind Konfiguration, CLI-Aufruf, Zwischenablage, Hotkey-Erkennung,
+Ersetzen-Ablauf, Popup mit Fassungen, Einstellungsdialog, Log, Autostart, Einzelinstanz und Update.
 
 ## Tray
 
@@ -60,7 +62,7 @@ dauerhaft sichtbar wird es über *Einstellungen → Personalisierung → Tasklei
 
 - **Tooltip und erste Menüzeile** zeigen den Zustand: „Abo aktiv“ oder die Warnung des Preflights, eine fehlerhafte
   `actions.json` und von anderen Programmen belegte Hotkeys. Bei einer Warnung bekommt das Icon einen roten Punkt.
-- **Menü (Rechtsklick):** Einstellungen, Logdatei öffnen, Beenden. **Doppelklick** öffnet die Einstellungen.
+- **Menü (Rechtsklick):** Einstellungen, Logdatei öffnen, Nach Updates suchen, Beenden. **Doppelklick** öffnet die Einstellungen.
 - **Benachrichtigungen** erscheinen bei belegten Hotkeys, fehlerhafter `actions.json` oder `theme.json` und wenn
   Claude nicht erreichbar ist oder einen API-Key benutzt.
 - **Nur eine Instanz:** Ein zweiter Start öffnet die Einstellungen der laufenden Instanz und beendet sich.
@@ -72,7 +74,33 @@ dauerhaft sichtbar wird es über *Einstellungen → Personalisierung → Tasklei
 Aktions-Kennung, Dauer und Code, z. B. `claude  action=improve  ms=6012  code=None`. `AppLog.Write` hat keinen
 Parameter für freien Text, und alle Werte werden auf Buchstaben, Ziffern und `-_.+` gekürzt; markierter Text oder
 Claudes Antwort können so nicht hineingeraten. Ereignisse: `start`, `preflight`, `capture`, `claude`, `claude-followup`, `replace`,
-`settings`, `autostart`, `config`, `hotkey`, `exit`.
+`settings`, `autostart`, `config`, `hotkey`, `update`, `exit`.
+
+## Automatisches Update
+
+Die installierte Kopie (`%LOCALAPPDATA%\Programs\ClaudeHotkey\ClaudeHotkey.exe`) hält sich selbst aktuell
+(`Update/Updater` im Core, `App.Update.cs`). Schalter: Einstellungen → Allgemein → „Automatisch aktualisieren“,
+`settings.autoUpdate` in `actions.json`, Standard an.
+
+- **Prüfen:** eine Minute nach dem Start, danach alle 6 Stunden, oder sofort über Tray → „Nach Updates suchen“ (das
+  geht auch bei ausgeschaltetem Schalter und meldet jedes Ergebnis). Gefragt wird
+  `https://api.github.com/repos/DanielSchmidt1985/WindowsTextAssistent/releases/latest`; ist dessen Tag `vX.Y.Z`
+  neuer als die eigene `<Version>`, wird das Asset `ClaudeHotkey.exe` geladen. Entwürfe und Vorabversionen zählen
+  nicht.
+- **Prüfen der Datei:** Der Download landet als `ClaudeHotkey.exe.new` neben der exe. Größe und SHA-256 müssen zu den
+  Angaben der API passen (`size`, `digest`), sonst wird die Datei gelöscht. Nur Links auf `https://github.com/`.
+- **Austauschen:** erst wenn kein Popup offen ist, nichts übernommen wird und der Einstellungsdialog zu ist (er
+  könnte ungespeicherte Änderungen haben); sonst jede Minute ein neuer Versuch. Eine laufende exe lässt sich unter
+  Windows nicht überschreiben, aber umbenennen: Die alte wird zu `ClaudeHotkey.exe.old`, die neue an ihren Platz
+  geschoben, mit `--updated <pid>` gestartet, und die alte beendet sich. Die neue wartet, bis der alte Prozess weg
+  ist (sonst schickt die Einzelinstanz-Prüfung sie weg), löscht `.old` und meldet im Tray „Auf Version X
+  aktualisiert“. Schlägt das Verschieben fehl, wird die alte exe zurückbenannt.
+- **Andere Kopien** (z. B. `bin\Debug`) aktualisieren sich nie; „Nach Updates suchen“ sagt das dort auch.
+- **Fehler** (kein Netz, GitHub antwortet nicht, Datei gesperrt) bleiben ohne Meldung; die alte Version läuft
+  weiter, und `log.txt` bekommt `update` mit dem Code, z. B. `NoConnection`, `ChecksumMismatch`, `WriteFailed`.
+  Erfolgreich: `Downloaded`, `Swapped`, nach dem Neustart `Installed` mit der Version.
+- Ein Release braucht deshalb immer das Asset `ClaudeHotkey.exe` (so erzeugt es der `gh release create`-Befehl aus
+  `CLAUDE.md`) und eine höhere `<Version>` in `src/ClaudeHotkey/ClaudeHotkey.csproj`.
 
 ## Autostart
 
@@ -162,7 +190,8 @@ wo es vom Standardmodell abweicht), Werte aus `ui.json` in `UiState.DefaultScale
 - Geprüft wird: eindeutige `id`, nicht leerer `prompt`, `askInput` nur mit `{input}` im Prompt, gültige und nicht
   doppelt vergebene Hotkeys, Wertebereiche für `doubleCopyMs` (100–2000) und `timeoutSeconds` (5–600).
 - Ist die Datei fehlerhaft, bleibt die zuletzt gültige Konfiguration aktiv; das Tray meldet die Fehler.
-- Zusätzlich zum Plan: `settings.autostart`, `settings.claudePath` und pro Aktion `hotkey` und `enabled`
+- Zusätzlich zum Plan: `settings.autostart`, `settings.autoUpdate` (Standard `true`, auch wenn das Feld fehlt),
+  `settings.claudePath` und pro Aktion `hotkey` und `enabled`
   (für den Einstellungsdialog). `enabled: false` blendet eine Aktion im Popup aus.
 - `settings.language`: `system` (Standard, Windows-Anzeigesprache), `de` oder `en`. `settings.theme`: `system`
   (Standard, App-Modus von Windows), `dark` oder `light`. Ältere Dateien ohne diese Felder folgen Windows.

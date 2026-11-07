@@ -102,4 +102,8 @@ public static class Ui
     public static string AutostartHint => T(
         "Beim Speichern wird dieses Programm unter HKCU\\…\\Run eingetragen bzw. wieder entfernt. Am besten aus der veröffentlichten .exe einschalten, nicht aus einem Test-Build.",
         "On saving, this program is added to or removed from HKCU\\…\\Run. Best switched on from the published .exe, not from a test build.");
+    public static string AutoUpdate => T("Automatisch aktualisieren", "Update automatically");
+    public static string AutoUpdateHint => T(
+        "Sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version und spielt sie ein, sobald kein Popup offen ist. Nur die installierte Kopie unter %LOCALAPPDATA%\\Programs\\ClaudeHotkey.",
+        "Looks for a new version on GitHub at start and every 6 hours and installs it as soon as no popup is open. Only the installed copy under %LOCALAPPDATA%\\Programs\\ClaudeHotkey.");
 }

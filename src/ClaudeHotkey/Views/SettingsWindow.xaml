@@ -271,6 +271,10 @@
                     <CheckBox Content="{x:Static l:Ui.Autostart}" IsChecked="{Binding Autostart}" Margin="0,18,0,0" />
                     <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="40,4,0,0" TextWrapping="Wrap"
                                Text="{x:Static l:Ui.AutostartHint}" />
+
+                    <CheckBox Content="{x:Static l:Ui.AutoUpdate}" IsChecked="{Binding AutoUpdate}" Margin="0,14,0,0" />
+                    <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="40,4,0,0" TextWrapping="Wrap"
+                               Text="{x:Static l:Ui.AutoUpdateHint}" />
                   </StackPanel>
                 </ScrollViewer>
             </TabItem>

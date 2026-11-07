@@ -19,6 +19,9 @@ public sealed class AppSettings
     public string SystemPrompt { get; set; } = "";
     public bool Autostart { get; set; }
 
+    /// <summary>The installed copy fetches new releases from GitHub by itself; see Update/Updater.</summary>
+    public bool AutoUpdate { get; set; } = true;
+
     /// <summary>Empty: search claude.exe / claude.cmd in PATH.</summary>
     public string ClaudePath { get; set; } = "";
 
