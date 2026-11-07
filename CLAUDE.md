@@ -20,7 +20,7 @@ ClaudeHotkey.exe --exit                                                         
 dotnet publish src/ClaudeHotkey -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
 ```
 
-Demo states (see `App.ShowDemo`): `choose input running result error nocapture replacefail feedback settings
+Demo states (see `App.ShowDemo`): `choose input running result followup error nocapture replacefail feedback settings
 settings-general settings-errors settings-test`, plus optional `[scale] [dark|light] [de|en]` in any order. Demos
 use copies in `%TEMP%`, never the real config. They are the way to check UI changes visually: start, screenshot,
 kill. Check both themes and both languages. The settings window is not topmost and may open on another monitor:

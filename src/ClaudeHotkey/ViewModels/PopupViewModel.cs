@@ -22,6 +22,14 @@ public sealed record ActionItem(ActionDefinition Definition, string Shortcut)
     public string ToolTip => Shortcut.Length > 0 ? Lang.T($"Taste {Shortcut}", $"Key {Shortcut}") : Definition.Label;
 }
 
+/// <summary>One result in the popup: the action's own (first) or one per follow-up.</summary>
+/// <param name="Label">Action label for the first version, the user's change request for the others.</param>
+/// <param name="Prompt">The action prompt it was made with (with {input} filled in).</param>
+public sealed record ResultVersion(string Label, string Prompt, string Text, string? Feedback);
+
+/// <summary>A chip in the version row; clicking it shows that version.</summary>
+public sealed record StepItem(int Index, string Label, bool IsCurrent);
+
 /// <summary>State of one popup: the captured text, the action buttons and the Claude call.</summary>
 public sealed class PopupViewModel : ObservableObject
 {
@@ -42,6 +50,11 @@ public sealed class PopupViewModel : ObservableObject
     private string _errorMessage = "";
     private string? _errorDetails;
     private bool _showDetails;
+    private readonly List<ResultVersion> _versions = [];
+    private int _versionIndex = -1;
+    private string _refineText = "";
+    // What "Erneut versuchen" repeats: the action or the follow-up that failed.
+    private Func<Task>? _lastAttempt;
 
     /// <param name="sourceText">The captured text; null when capturing failed.</param>
     /// <param name="captureMessage">Why capturing failed, shown instead of the actions.</param>
@@ -65,8 +78,19 @@ public sealed class PopupViewModel : ObservableObject
             ReplaceError = null;
             ReplaceRequested?.Invoke(this, ResultText);
         }, () => CanReplace);
-        RetryCommand = new RelayCommand(() => { if (_current is { } item) _ = RunAsync(item, InputText); }, () => CanRetry);
+        RetryCommand = new RelayCommand(() => { if (_lastAttempt is { } attempt) _ = attempt(); }, () => CanRetry);
         ToggleDetailsCommand = new RelayCommand(() => ShowDetails = !ShowDetails);
+        RefineCommand = new RelayCommand(() => { if (CanRefine) _ = RefineAsync(RefineText.Trim()); }, () => CanRefine);
+        PreviousVersionCommand = new RelayCommand(() => ShowVersion(_versionIndex - 1), () => HasResult && _versionIndex > 0);
+        NextVersionCommand = new RelayCommand(() => ShowVersion(_versionIndex + 1), () => HasResult && _versionIndex < _versions.Count - 1);
+        SelectVersionCommand = new RelayCommand(p => { if (p is StepItem step) ShowVersion(step.Index); }, _ => HasResult);
+        BackToResultCommand = new RelayCommand(() =>
+        {
+            if (!CanReturnToResult)
+                return;
+            ShowVersion(_versionIndex);
+            RefineFocusRequested?.Invoke(this, EventArgs.Empty);
+        }, () => CanReturnToResult);
 
         if (sourceText is null)
         {
@@ -81,8 +105,11 @@ public sealed class PopupViewModel : ObservableObject
     /// <summary>Asks the window to focus the input field.</summary>
     public event EventHandler? InputRequested;
 
-    /// <summary>After each Claude call: action id, duration and outcome, for the log file.</summary>
-    public event EventHandler<(string ActionId, TimeSpan Duration, ClaudeErrorKind Error)>? RunCompleted;
+    /// <summary>Asks the window to focus the follow-up field (after a follow-up, so the next one can be typed right away).</summary>
+    public event EventHandler? RefineFocusRequested;
+
+    /// <summary>After each Claude call: action id, duration, outcome and whether it was a follow-up, for the log file.</summary>
+    public event EventHandler<(string ActionId, TimeSpan Duration, ClaudeErrorKind Error, bool FollowUp)>? RunCompleted;
 
     /// <summary>"Ersetzen" was chosen; the argument is the text to paste into the source window.</summary>
     public event EventHandler<string>? ReplaceRequested;
@@ -125,6 +152,8 @@ public sealed class PopupViewModel : ObservableObject
             OnPropertyChanged(nameof(HasError));
             OnPropertyChanged(nameof(CanReplace));
             OnPropertyChanged(nameof(CanRetry));
+            OnPropertyChanged(nameof(CanReturnToResult));
+            OnPropertyChanged(nameof(HasVersions));
             OnPropertyChanged(nameof(CanRunActions));
             OnPropertyChanged(nameof(RunningLabel));
             CommandManager.InvalidateRequerySuggested();
@@ -140,7 +169,31 @@ public sealed class PopupViewModel : ObservableObject
     /// <summary>The "Ersetzen" button is shown for actions with replace=true.</summary>
     public bool CanReplace => HasResult && _current?.Definition.Replace == true;
 
-    public bool CanRetry => HasError && _current is not null;
+    public bool CanRetry => HasError && _lastAttempt is not null;
+
+    /// <summary>After a failed follow-up the previous result is still there.</summary>
+    public bool CanReturnToResult => HasError && _versionIndex >= 0;
+
+    public bool CanRefine => HasResult && RefineText.Trim().Length > 0;
+
+    /// <summary>The user's change request for the shown result ("in Du-Form").</summary>
+    public string RefineText
+    {
+        get => _refineText;
+        set
+        {
+            if (Set(ref _refineText, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    /// <summary>The version row is shown once there is more than one result.</summary>
+    public bool HasVersions => HasResult && _versions.Count > 1;
+
+    public IReadOnlyList<StepItem> Steps =>
+        _versions.Select((version, index) => new StepItem(index, version.Label, index == _versionIndex)).ToList();
+
+    public string VersionInfo => _versions.Count == 0 ? "" : $"{_versionIndex + 1} / {_versions.Count}";
 
     public string RunningLabel => _current is null ? "" : $"{_current.Label} …";
 
@@ -226,6 +279,11 @@ public sealed class PopupViewModel : ObservableObject
     public ICommand ReplaceCommand { get; }
     public ICommand RetryCommand { get; }
     public ICommand ToggleDetailsCommand { get; }
+    public ICommand RefineCommand { get; }
+    public ICommand PreviousVersionCommand { get; }
+    public ICommand NextVersionCommand { get; }
+    public ICommand SelectVersionCommand { get; }
+    public ICommand BackToResultCommand { get; }
 
     /// <summary>Runs the action with the given shortcut (1–9). False when there is none.</summary>
     public bool TryRunShortcut(string key)
@@ -264,7 +322,54 @@ public sealed class PopupViewModel : ObservableObject
         return RunAsync(item, null);
     }
 
-    private async Task RunAsync(ActionItem item, string? input)
+    /// <summary>Runs the action on the selected text; its result starts a new version history.</summary>
+    private Task RunAsync(ActionItem item, string? input)
+    {
+        var prompt = item.Definition.BuildPrompt(input);
+        _lastAttempt = () => RunAsync(item, input);
+        return ExecuteAsync(item, prompt, null, result =>
+        {
+            _versions.Clear();
+            _versions.Add(new ResultVersion(item.Label, prompt, result.Text!, result.Feedback));
+        });
+    }
+
+    /// <summary>Reworks the shown version; versions after it are dropped, like undo in an editor.</summary>
+    private Task RefineAsync(string instruction)
+    {
+        if (_current is not { } item || _versionIndex < 0)
+            return Task.CompletedTask;
+        var baseIndex = _versionIndex;
+        var start = _versions[baseIndex];
+        // The wishes on the way to the shown version, plus the new one; the action's own version has none.
+        var instructions = _versions.Skip(1).Take(baseIndex).Select(v => v.Label).Append(instruction).ToList();
+        _lastAttempt = () => RefineAsync(instruction);
+        return ExecuteAsync(item, start.Prompt, new Refinement(start.Text, instructions), result =>
+        {
+            _versions.RemoveRange(baseIndex + 1, _versions.Count - baseIndex - 1);
+            _versions.Add(new ResultVersion(instruction, start.Prompt, result.Text!, result.Feedback));
+            RefineText = "";
+        });
+    }
+
+    private void ShowVersion(int index)
+    {
+        if (index < 0 || index >= _versions.Count)
+            return;
+        _versionIndex = index;
+        var version = _versions[index];
+        ResultText = version.Text;
+        FeedbackText = version.Feedback;
+        ErrorDetails = null;
+        ReplaceError = null;
+        OnPropertyChanged(nameof(Steps));
+        OnPropertyChanged(nameof(VersionInfo));
+        OnPropertyChanged(nameof(HasVersions));
+        State = PopupState.Result;
+        CommandManager.InvalidateRequerySuggested();
+    }
+
+    private async Task ExecuteAsync(ActionItem item, string prompt, Refinement? refinement, Action<ClaudeResult> addVersion)
     {
         if (_sourceText is null || IsRunning)
             return;
@@ -288,12 +393,13 @@ public sealed class PopupViewModel : ObservableObject
 
         var definition = item.Definition;
         var request = new ClaudeRequest(
-            definition.BuildPrompt(input),
+            prompt,
             _sourceText,
             definition.EffectiveModel(_settings),
             _settings.SystemPrompt,
             TimeSpan.FromSeconds(_settings.TimeoutSeconds),
-            definition.Feedback);
+            definition.Feedback,
+            refinement);
 
         ClaudeResult result;
         var started = System.Diagnostics.Stopwatch.StartNew();
@@ -310,17 +416,23 @@ public sealed class PopupViewModel : ObservableObject
             _running = null;
             StreamingText = "";
         }
-        RunCompleted?.Invoke(this, (definition.Id, started.Elapsed, result.Error));
+        RunCompleted?.Invoke(this, (definition.Id, started.Elapsed, result.Error, refinement is not null));
 
         if (result.Success)
         {
-            ResultText = result.Text!;
-            FeedbackText = result.Feedback;
-            ErrorDetails = null;
-            State = PopupState.Result;
+            addVersion(result);
+            ShowVersion(_versions.Count - 1);
+            if (refinement is not null)
+                RefineFocusRequested?.Invoke(this, EventArgs.Empty);
         }
         else
         {
+            // A failed new action leaves nothing to go back to; a failed follow-up keeps the versions.
+            if (refinement is null)
+            {
+                _versions.Clear();
+                _versionIndex = -1;
+            }
             ErrorMessage = result.Message ?? ClaudeCli.MessageFor(result.Error);
             ErrorDetails = result.Details;
             State = PopupState.Error;

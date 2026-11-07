@@ -80,6 +80,39 @@
                 </TextBlock>
             </StackPanel>
 
+            <!-- Versions: the action's result and one per follow-up; a chip or the arrows show an older one -->
+            <DockPanel Margin="0,6,0,0" Visibility="{Binding HasVersions, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Style="{StaticResource IconButton}" Content="‹" FontSize="16" Height="22" ToolTip="{x:Static l:Ui.PreviousVersion}"
+                            Command="{Binding PreviousVersionCommand}" IsTabStop="False" />
+                    <TextBlock Style="{StaticResource Muted}" Text="{Binding VersionInfo}" VerticalAlignment="Center" Margin="2,0" />
+                    <Button Style="{StaticResource IconButton}" Content="›" FontSize="16" Height="22" ToolTip="{x:Static l:Ui.NextVersion}"
+                            Command="{Binding NextVersionCommand}" IsTabStop="False" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Steps}" Focusable="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:StepItem}">
+                            <Button x:Name="Chip" Style="{StaticResource ChipButton}" Margin="0,0,4,4" ToolTip="{Binding Label}" IsTabStop="False"
+                                    Command="{Binding DataContext.SelectVersionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}">
+                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                            </Button>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                    <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="Chip" Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </DockPanel>
+
             <!-- Result -->
             <TextBox x:Name="ResultBox" Style="{StaticResource ReadOnlyText}" Text="{Binding ResultText, Mode=OneWay}" Margin="0,4,0,0"
                      MaxHeight="320" Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
@@ -93,6 +126,27 @@
                              MaxHeight="220" Background="Transparent" BorderThickness="0" Padding="4,2" />
                 </StackPanel>
             </Border>
+
+            <!-- Follow-up on the shown result ("in Du-Form"); Enter sends it, with an empty field Enter replaces -->
+            <DockPanel Margin="0,8,0,0" Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
+                <Button DockPanel.Dock="Right" Content="{x:Static l:Ui.Send}" Margin="4,0,0,0" Command="{Binding RefineCommand}" IsTabStop="False" />
+                <Grid>
+                    <TextBox x:Name="RefineBox" Text="{Binding RefineText, UpdateSourceTrigger=PropertyChanged}" ToolTip="{x:Static l:Ui.RefineTip}" />
+                    <TextBlock Text="{x:Static l:Ui.RefinePlaceholder}" Foreground="{DynamicResource MutedTextBrush}" Margin="9,0,0,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RefineText}" Value="">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </DockPanel>
 
             <!-- Error -->
             <StackPanel Margin="0,8,0,0" Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
@@ -110,6 +164,8 @@
 
             <!-- Footer -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                <Button Content="{x:Static l:Ui.BackToResult}" Margin="0,0,4,0" Command="{Binding BackToResultCommand}"
+                        Visibility="{Binding CanReturnToResult, Converter={StaticResource BoolToVisibility}}" />
                 <Button Content="{x:Static l:Ui.Retry}" Margin="0,0,4,0" Command="{Binding RetryCommand}"
                         Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}" />
                 <Button Content="{x:Static l:Ui.Copy}" Margin="0,0,4,0" Command="{Binding CopyCommand}"

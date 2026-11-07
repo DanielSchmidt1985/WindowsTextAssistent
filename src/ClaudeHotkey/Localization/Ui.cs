@@ -18,6 +18,14 @@ public static class Ui
     public static string InputTip => T("Anweisung an Claude, Enter führt aus", "Instruction for Claude, Enter runs it");
     public static string EscCancels => T("  Esc bricht ab", "  Esc cancels");
     public static string Retry => T("Erneut versuchen", "Try again");
+    public static string BackToResult => T("Zurück zum Ergebnis", "Back to the result");
+    public static string Send => T("Senden", "Send");
+    public static string RefinePlaceholder => T("Weiter bearbeiten, z. B. „in Du-Form“", "Keep editing, e.g. \"more casual\"");
+    public static string RefineTip => T(
+        "Änderungswunsch für dieses Ergebnis, Enter schickt ihn. Die gespeicherte Aktion bleibt unverändert.",
+        "Change request for this result, Enter sends it. The saved action stays unchanged.");
+    public static string PreviousVersion => T("Vorherige Fassung", "Previous version");
+    public static string NextVersion => T("Nächste Fassung", "Next version");
     public static string Copy => T("Kopieren", "Copy");
     public static string Replace => T("Ersetzen", "Replace");
     public static string ReplaceTip => T("Markierten Text im Quellfenster ersetzen (Enter)", "Replace the selected text in the source window (Enter)");

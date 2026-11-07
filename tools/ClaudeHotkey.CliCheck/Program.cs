@@ -1,5 +1,5 @@
 ﻿// Manual check of the CLI core: runs the preflight, then sends one text through "claude -p".
-// Usage: ClaudeHotkey.CliCheck [--model <alias>] [--claude <path>] [--prompt <action prompt>] [--feedback <instruction>] [text]
+// Usage: ClaudeHotkey.CliCheck [--model <alias>] [--claude <path>] [--prompt <action prompt>] [--feedback <instruction>] [--then <change request>]... [text]
 using System.Diagnostics;
 using System.Text;
 using ClaudeHotkey.Core.Claude;
@@ -9,6 +9,7 @@ Console.OutputEncoding = new UTF8Encoding(false);
 var model = "haiku";
 string? claudePath = null;
 string? feedback = null;
+var followUps = new List<string>();
 var prompt = "Korrigiere nur Rechtschreibung, Grammatik und Zeichensetzung. Ändere sonst nichts.";
 var textParts = new List<string>();
 for (var i = 0; i < args.Length; i++)
@@ -19,6 +20,7 @@ for (var i = 0; i < args.Length; i++)
         case "--claude" when i + 1 < args.Length: claudePath = args[++i]; break;
         case "--prompt" when i + 1 < args.Length: prompt = args[++i]; break;
         case "--feedback" when i + 1 < args.Length: feedback = args[++i]; break;
+        case "--then" when i + 1 < args.Length: followUps.Add(args[++i]); break;
         default: textParts.Add(args[i]); break;
     }
 }
@@ -62,4 +64,19 @@ if (partials > 0)
 Console.WriteLine(result.Success
     ? $"Antwort:    {result.Text} ({watch.Elapsed.TotalSeconds:0.0} s)" + (result.Feedback is { } f ? $"\nFeedback:\n{f}" : feedback is null ? "" : "\nFeedback:   (leer)")
     : $"Fehler:     {result.Message}\n\nDetails:\n{result.Details}");
+
+// Follow-ups as in the popup's "Weiter bearbeiten" field, each on the previous answer.
+var instructions = new List<string>();
+foreach (var followUp in followUps)
+{
+    if (!result.Success)
+        break;
+    instructions.Add(followUp);
+    watch.Restart();
+    result = await cli.RunAsync(request with { Refinement = new Refinement(result.Text!, instructions.ToList()) });
+    Console.WriteLine($"\nWeiter:     {followUp}");
+    Console.WriteLine(result.Success
+        ? $"Antwort:    {result.Text} ({watch.Elapsed.TotalSeconds:0.0} s)" + (result.Feedback is { } g ? $"\nFeedback:\n{g}" : "")
+        : $"Fehler:     {result.Message}\n\nDetails:\n{result.Details}");
+}
 return result.Success ? 0 : 1;

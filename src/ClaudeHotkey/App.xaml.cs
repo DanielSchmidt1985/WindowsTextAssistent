@@ -368,7 +368,7 @@ public partial class App : Application
             config,
             (request, onPartialText, token) => cli.RunAsync(request, onPartialText, token),
             text => _clipboard.SetText(text));
-        viewModel.RunCompleted += (_, run) => _log.Write("claude", run.ActionId, run.Duration, run.Error.ToString());
+        viewModel.RunCompleted += (_, run) => _log.Write(run.FollowUp ? "claude-followup" : "claude", run.ActionId, run.Duration, run.Error.ToString());
 
         var popup = CreatePopup(viewModel, anchor);
         var closed = false;
@@ -405,7 +405,7 @@ public partial class App : Application
 
     /// <summary>
     /// Opens the popup in one state with sample text and a simulated Claude answer, without hooks
-    /// or CLI calls: <c>ClaudeHotkey.exe --demo choose|input|running|result|error|nocapture|replacefail [scale] [dark|light] [de|en]</c>.
+    /// or CLI calls: <c>ClaudeHotkey.exe --demo choose|input|running|result|followup|error|nocapture|replacefail [scale] [dark|light] [de|en]</c>.
     /// For checking the design against the reference screenshot.
     /// </summary>
     private void ShowDemo(string state)
@@ -483,6 +483,13 @@ public partial class App : Application
                         "• \"I want make\" → \"I would like to\": \"want\" is followed by \"to\", \"would like\" sounds more polite.\n" +
                         "• \"tomorow\" → \"tomorrow\": two r, one w."));
             },
+            // Answers at once, so the follow-up can be sent right after the action in ContentRendered.
+            "followup" => (request, _, _) => Task.FromResult(new ClaudeResult(ClaudeErrorKind.None,
+                request.Refinement is null
+                    ? corrected
+                    : Lang.T("Guten Tag zusammen,\n\nanbei erhalten Sie die Unterlagen für das morgige Meeting. Bitte sehen Sie sie vorab kurz durch und geben Sie mir Bescheid, falls etwas fehlt.",
+                             "Dear all,\n\nplease find attached the documents for tomorrow's meeting. Kindly review them beforehand and let me know if anything is missing."),
+                null, null)),
             "error" => (_, _, _) => Task.FromResult(new ClaudeResult(ClaudeErrorKind.NotLoggedIn, null,
                 ClaudeCli.MessageFor(ClaudeErrorKind.NotLoggedIn),
                 "Exit-Code: 1\n\nstdout:\n{\"is_error\":true,\"result\":\"Failed to authenticate: OAuth session expired\"}")),
@@ -508,6 +515,11 @@ public partial class App : Application
                 case "input": viewModel.TryRunShortcut("8"); break;
                 case "running" or "result" or "error": viewModel.TryRunShortcut("2"); break;
                 case "feedback": viewModel.TryRunShortcut("3"); break;
+                case "followup":
+                    viewModel.TryRunShortcut("2");
+                    viewModel.RefineText = Lang.T("formeller, mit Sie", "more formal");
+                    viewModel.RefineCommand.Execute(null);
+                    break;
                 case "replacefail":
                     viewModel.TryRunShortcut("2");
                     viewModel.ReplaceError = TextReplacer.ActivateFailedMessage;

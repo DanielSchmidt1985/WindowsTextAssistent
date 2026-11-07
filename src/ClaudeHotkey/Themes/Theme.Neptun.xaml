@@ -125,6 +125,15 @@
         <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
 
+    <!-- Small step in the popup's version row; the shown version gets the accent border -->
+    <Style x:Key="ChipButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Height" Value="22" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        <Setter Property="MaxWidth" Value="180" />
+    </Style>
+
     <!-- Text boxes -->
     <Style TargetType="TextBox">
         <Setter Property="FontFamily" Value="{StaticResource UiFont}" />

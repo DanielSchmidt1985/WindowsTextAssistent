@@ -35,6 +35,9 @@ public partial class PopupWindow : Window
 
         viewModel.CloseRequested += (_, _) => Close();
         viewModel.InputRequested += (_, _) => Dispatcher.BeginInvoke(() => { InputBox.Focus(); Keyboard.Focus(InputBox); });
+        // Deferred: the field is collapsed while the call runs and becomes visible with the result.
+        viewModel.RefineFocusRequested += (_, _) => Dispatcher.BeginInvoke(() => { RefineBox.Focus(); Keyboard.Focus(RefineBox); },
+                                                                           System.Windows.Threading.DispatcherPriority.Input);
 
         SourceInitialized += (_, _) => Place();
         // The window grows when the result arrives; keep it inside the screen (unless the user moved it).
@@ -78,8 +81,19 @@ public partial class PopupWindow : Window
             return;
         }
 
-        // Digits run actions, except while typing an instruction.
-        if (!InputBox.IsKeyboardFocusWithin && Keyboard.Modifiers == ModifierKeys.None && DigitOf(e.Key) is { } digit)
+        // Enter in the follow-up field sends the change request; with an empty field it falls through
+        // to the default button "Ersetzen", so Enter after a follow-up still replaces.
+        if (e.Key == Key.Enter && RefineBox.IsKeyboardFocusWithin && Keyboard.Modifiers == ModifierKeys.None
+            && _viewModel.RefineCommand.CanExecute(null))
+        {
+            e.Handled = true;
+            _viewModel.RefineCommand.Execute(null);
+            return;
+        }
+
+        // Digits run actions, except while typing an instruction or a change request.
+        var typing = InputBox.IsKeyboardFocusWithin || RefineBox.IsKeyboardFocusWithin;
+        if (!typing && Keyboard.Modifiers == ModifierKeys.None && DigitOf(e.Key) is { } digit)
             e.Handled = _viewModel.TryRunShortcut(digit);
 
         base.OnPreviewKeyDown(e);

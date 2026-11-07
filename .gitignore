@@ -483,3 +483,4 @@ $RECYCLE.BIN/
 
 # Release build (dotnet publish -o publish)
 /publish/
+.superpowers/
